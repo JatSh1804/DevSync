@@ -1,0 +1,21 @@
+.wrapdiv {
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+    width: 100vw;
+}
+
+.CodeMirror {
+    width: 70vw;
+    margin-right: 30px;
+    height: 100vh;
+}
+select{
+    padding: 10px 15px;background-color: #5576b7ce;
+}
+.sidebar{
+   width: 30vw;
+}
+.CodeMirror-gutter-wrapper{
+    left:-29px !important;
+}
