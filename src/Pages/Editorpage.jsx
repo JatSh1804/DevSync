@@ -26,7 +26,7 @@ export default function Editorpage() {
     // console.log(msgArray);
     const { RoomId } = useParams()
 
-    const socket = io("localhost:3002", () => {
+    const socket = io("/", () => {
     });
     useEffect(() => { console.log(msgArray) }, [msgArray])
     useEffect(() => {
