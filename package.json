@@ -2,7 +2,6 @@
   "name": "code-share",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
   "scripts": {
     "start:front":"npm run dev",
     "start": "npm run build && node server.js",
