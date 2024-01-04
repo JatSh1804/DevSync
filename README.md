@@ -11,7 +11,7 @@ This is a real-time code sharing and chat application built with Node.js and Soc
 
 1. Clone the repository:
    ```bash
-   git clone
+   git clone https://github.com/JatSh1804/DevSync.git
    ```
 2. Install the dependencies:
    ```bash
