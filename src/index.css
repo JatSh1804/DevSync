@@ -21,7 +21,6 @@ body {
   color: white;
 }
 
-/* h1{color: ;} */
 input {
   padding: 10px 5px;
   border-radius: 5px;
@@ -58,13 +57,16 @@ input {
 button.link::before {
   content: '';
   position: absolute;
-  width: 0;
+  width: 100%;
   height: 2px;
+ transform: scaleX(0);
   background-color: rgb(136, 239, 136);
-  transition: width 0.3s ease;
+  transition: width 0.3s ease,transform 0.2s ease;
   bottom: 0;
+  transform-origin: right;
 }
 
 button.link:hover::before {
-  width: 100%;
+  transform: scaleX(1);
+  transform-origin:left ;
 }

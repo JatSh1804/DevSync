@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate, Navigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Codemirror from "codemirror";
 import "codemirror/lib/codemirror.css"
 import "codemirror/theme/dracula.css"
@@ -9,7 +9,8 @@ import "codemirror/addon/edit/closetag";
 import "codemirror/addon/edit/closebrackets";
 import "codemirror/addon/display/autorefresh"
 import "./EditorPage.css";
-import { Socket, io } from "socket.io-client";
+import { io } from "socket.io-client";
+import { socketinit } from "../socket";
 import Toast, { Toaster } from "react-hot-toast";
 
 
@@ -20,19 +21,84 @@ export default function Editorpage() {
     const navigate = useNavigate();
     const editorref = useRef();
     const codeRef = useRef('');
+    const socket = useRef();
 
     const [message, setMessage] = useState('');
     const [msgArray, setmsgArray] = useState([]);
     // console.log(msgArray);
     const { RoomId } = useParams()
+    const { queryRoom } = useSearchParams();
+    const [lastEdit, setlastEdit] = useState();
 
-    const socket = io("localhost:3002", () => {
-    });
+    // const socket = io('http://localhost:3002', () => {});
     useEffect(() => { console.log(msgArray) }, [msgArray])
     useEffect(() => {
+        const connect = async () => {
+            socket.current = await socketinit();
+            socket.current.on('connect_error', (err) => Toast.error("Not Able to connect right now!"));
+            socket.current.on('connect_failed', (err) => Toast.error("Not Able to connect right now!"));
+
+            let changeTimer;
+
+            editorref.current.on('change', (instance, changes) => {
+                codeRef.current = instance.getValue();
+
+                // Clear the existing timer
+                clearTimeout(changeTimer);
+
+                // Set a new timer to emit "Code Change" after 2 seconds of inactivity
+                changeTimer = setTimeout(() => {
+                    if (changes.origin != 'setValue') {
+                        socket.current.emit("Code Change", { RoomId, username, code: instance.getValue() });
+                    }
+                }, 2000); // 2 seconds delay
+            });
+
+            socket.current.on("connect", () => {
+                console.log("Connected to the Server!")
+                socket.current.emit('UserJoin', { RoomId: RoomId, username: username })
+                // console.log(socket.id)
+
+                socket.current.on("Joined", ({ client, socketId, username }) => {
+                    console.log(socket.current.id)
+                    setClients(client);
+                    (location.state?.username == username) ?
+                        Toast.success("You joined a Room!") :
+                        Toast.success(`${username} Joined the Room!`);
+                    if (codeRef.current) {
+                        // socket.current.emit("Code Change", { RoomId, code: codeRef.current })
+                        console.log(codeRef.current);
+                    }
+                });
+
+                socket.current.on("Userleave", ({ User, socketId }) => {
+                    console.log(`${User.username} left...`)
+                    setClients(prev => prev.filter(item => { return item.socketId !== socketId }))
+                    console.log(Client)
+                    Toast.error(`${User.username} left the room!`)
+                })
+
+                socket.current.on("Code Sync", (code) => {
+                    console.log("Got some changes...")
+                    console.log(code);
+                    setlastEdit(code.username);
+                    editorref.current.setValue(code.code);
+                })
+                socket.current.on("message receive", ({ message, sender, username }) => {
+                    console.log("client received", message)
+                    // console.log(msgArray);
+                    setmsgArray(prev => { return [...prev, { sender, message, username }] });
+                    console.log(msgArray);
+                })
+            })
+            socket.current.on("connection_failed", () => { Toast.error("No Connection established!") })
+
+        };
+        connect();
+
         if (location.state == null) {
             console.log("emtpy");
-            navigate('/');
+            navigate('/', { state: { RoomId: queryRoom } });
             return;
         }
 
@@ -48,57 +114,13 @@ export default function Editorpage() {
             })
         };
         init();
-        editorref.current.on('change', (instance, changes) => {
-            codeRef.current = instance.getValue();
-            if (changes.origin != 'setValue') {
-                socket.emit("Code Change", { RoomId, code: instance.getValue() })
-            }
-        });
-
-
-
-        socket.on("connect", () => {
-            console.log("Connected to the Server!")
-            socket.emit('UserJoin', { RoomId: RoomId, username: username })
-            // console.log(socket.id)
-
-            socket.on("Joined", ({ client, socketId, username }) => {
-                console.log(socket.id)
-                setClients(client);
-                (location.state?.username == username) ?
-                    Toast.success("You joined a Room!") :
-                    Toast.success(`${username} Joined the Room!`);
-                if (codeRef.current) {
-                    socket.emit("Code Change", { RoomId, code: codeRef.current })
-                    console.log(codeRef.current);
-                }
-            });
-
-            socket.on("Userleave", ({ User, socketId }) => {
-                console.log(`${User.username} left...`)
-                setClients(prev => prev.filter(item => { return item.socketId !== socketId }))
-                console.log(Client)
-                Toast.error(`${User.username} left the room!`)
-            })
-
-            socket.on("Code Sync", (code) => {
-                console.log("Got some changes...")
-                console.log(code);
-                editorref.current.setValue(code.code);
-            })
-            socket.on("message receive", ({ message, sender, username }) => {
-                console.log("client received", message)
-                // console.log(msgArray);
-                setmsgArray(prev => { return [...prev, { sender, message, username }] });
-                console.log(msgArray);
-            })
-        })
-        return () => { socket.disconnect(); socket.off("Joined") }
+        return () => { socket.current.disconnect(); socket.current.off("Joined") }
     }, []);
 
     const sendMsg = (e) => {
         e.preventDefault();
-        socket.emit("chat message", { RoomId: RoomId, message: message, sender: socket.id, username: location.state.username });
+        if (message == '') { Toast.error('Message field cannot be empty!'); return; }
+        socket.current.emit("chat message", { RoomId: RoomId, message: message, sender: socket.current.id, username: location.state.username });
         console.log('emitting...')
         setMessage('');
     }
@@ -126,23 +148,26 @@ export default function Editorpage() {
                     <option name='javascript'>Java Script</option>
                     <option name='c++src'>C++</option>
                 </select>
+                {lastEdit && <p>Last edit by {lastEdit}</p>}
 
                 {Client.map(item => { return item.username; })}
 
-                <input type="button" className="success" onClick={copyclipboard} value={'Copy Room Id'}></input>
-                <input type="button" className="error" onClick={leaveroom} value={'Leave Room'}></input>
                 <ul>
                     {msgArray.map((item) => { return <li className={item.type}>{item.username}:{item.message}</li> })}
                 </ul>
-                <form>
+                <form className="chat">
                     <input type="text" onChange={e => { setMessage(e.target.value) }} placeholder="Type Message..." value={message}></input>
                     <input type="submit" onClick={sendMsg} value={"send"}></input>
                 </form>
+                <div style={{ display: 'grid', gap: '10px', marginBottom: 10 }}>
+                    <input style={{}} type="button" className="success" onClick={copyclipboard} value={'Copy Room Id'}></input>
+                    <input style={{}} type="button" className="error" onClick={leaveroom} value={'Leave Room'}></input>
+                </div>
             </div>
             <div className="realtimeeditor">
                 <textarea id="codeeditor"></textarea>
             </div>
-        </div >
+        </div>
 
     </>
 }

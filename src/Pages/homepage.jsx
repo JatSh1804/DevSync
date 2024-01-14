@@ -1,14 +1,16 @@
 import React, { useState } from "react"
 import "./homepage.css"
-import { Link, Navigate, useNavigate } from "react-router-dom"
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import { v4 as uuidV4 } from "uuid"
-import Toast, { Toaster} from "react-hot-toast"
+import Toast, { Toaster } from "react-hot-toast"
 
 export default function Homepage() {
+    const location = useLocation();
+    const [queryRoom, setqueryRoom] = useSearchParams();
     const navigate = useNavigate();
-    const [RoomId, setRoomID] = useState('');
-    const [username, setUsername] = useState('');
 
+    const [RoomId, setRoomID] = useState(queryRoom.get( 'room') || location?.state?.RoomId || '');
+    const [username, setUsername] = useState('');
 
     const onSubmit = e => {
         e.preventDefault();
