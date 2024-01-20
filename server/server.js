@@ -31,16 +31,16 @@ app.use((req, res, next) => {
 app.post("/SignUp", (req, res) => SignUp(req, res));
 app.post('/Login', (req, res) => Login(req, res));
 
-io.use(async (socket, next) => {
-    authenticate(socket, next)
-        .then((decoded) => {
-            socket.decoded = decoded;
-            console.log("decode=>", decoded)
-            next()
-        })
-        .catch(err => { console.log(err.message), next(new Error(err.message)) })
-    // console.log(verification)
-})
+// io.use(async (socket, next) => {
+//     authenticate(socket, next)
+//         .then((decoded) => {
+//             socket.decoded = decoded;
+//             console.log("decode=>", decoded)
+//             next()
+//         })
+//         .catch(err => { console.log(err.message), next(new Error(err.message)) })
+//     // console.log(verification)
+// })
 
 
 
