@@ -30,6 +30,10 @@ export default function Editorpage() {
     const { queryRoom } = useSearchParams();
     const [lastEdit, setlastEdit] = useState();
 
+    const [Client, setClients] = useState([])
+    const [mode, setmode] = useState('js')
+
+
     // const socket = io('http://localhost:3002', () => {});
     useEffect(() => { console.log(msgArray) }, [msgArray])
     useEffect(() => {
@@ -83,6 +87,11 @@ export default function Editorpage() {
                     console.log(code);
                     setlastEdit(code.username);
                     editorref.current.setValue(code.code);
+                    // editorref.current.focus();
+                    editorref.current.setCursor({ line: 1, ch: 5 })
+                })
+                socket.current.on("Result", ({ result }) => {
+                    console.log(result);
                 })
                 socket.current.on("message receive", ({ message, sender, username }) => {
                     console.log("client received", message)
@@ -105,12 +114,17 @@ export default function Editorpage() {
         const { RoomId, username } = location.state
         async function init() {
             editorref.current = Codemirror.fromTextArea(document.getElementById("codeeditor"), {
-                mode: { name: `${mode == 'javascript' ? mode : 'text/x-' + mode}`, json: true },
+                mode: {
+                    name: `${mode == 'js' ? 'javascript' : 'text/x-' + 'javascript'}`
+                    , json: true
+                },
                 theme: 'dracula',
                 autoCloseBrackets: true,
                 autoclosetags: true,
                 lineNumbers: true,
-                autoRefresh: true
+                autoRefresh: true,
+                dragDrop: true,
+                autofocus: true
             })
         };
         init();
@@ -132,21 +146,23 @@ export default function Editorpage() {
     }
     const copyclipboard = async () => {
         Toast.success("Room ID copied!")
-        await navigator.clipboard.writeText(location.state?.RoomId)
+        await navigator.clipboard.writeText(RoomId)
+    }
+    const compile = async (e) => {
+        e.preventDefault();
+        socket.current.emit("Compile", { code: codeRef.current, RoomId, language: mode, input: "" })
     }
 
     // console.log(location.state)
-    const [Client, setClients] = useState([])
-    const [mode, setmode] = useState('javascript')
     // console.log(mode)
 
     return <><Toaster position="top-right" />
         <div className="wrapdiv">
             <div className="sidebar">
-                <select value={mode} onChange={e => { setmode(e.target.name) }}>
-                    <option defaultChecked={true} name='java'>Java</option>
-                    <option name='javascript'>Java Script</option>
-                    <option name='c++src'>C++</option>
+                <select value={mode} onChange={e => { setmode([e.target.name, e.target.value]) }}>
+                    <option defaultChecked={true} value='javascript' name='js'>javascript</option>
+                    <option value='clike' name='java'>Java</option>
+                    <option value='clike' name='cpp'>C++</option>
                 </select>
                 {lastEdit && <p>Last edit by {lastEdit}</p>}
 
@@ -160,6 +176,7 @@ export default function Editorpage() {
                     <input type="submit" onClick={sendMsg} value={"send"}></input>
                 </form>
                 <div style={{ display: 'grid', gap: '10px', marginBottom: 10 }}>
+                    <input type="button" className="success" onClick={compile} value="Run" />
                     <input style={{}} type="button" className="success" onClick={copyclipboard} value={'Copy Room Id'}></input>
                     <input style={{}} type="button" className="error" onClick={leaveroom} value={'Leave Room'}></input>
                 </div>

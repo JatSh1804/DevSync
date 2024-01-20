@@ -9,7 +9,7 @@ export default function Homepage() {
     const [queryRoom, setqueryRoom] = useSearchParams();
     const navigate = useNavigate();
 
-    const [RoomId, setRoomID] = useState(queryRoom.get( 'room') || location?.state?.RoomId || '');
+    const [RoomId, setRoomID] = useState(queryRoom.get('room') || location?.state?.RoomId || '');
     const [username, setUsername] = useState('');
 
     const onSubmit = e => {
@@ -47,7 +47,7 @@ export default function Homepage() {
             </form>
 
             <p>Don't have a Room Id? &nbsp;
-                <button onClick={RoomCreate} className="link" colorScheme='teal' variant='link'> Create Room</button>
+                <button onClick={RoomCreate} className="link" colorscheme='teal' variant='link'> Create Room</button>
             </p>
 
         </div>
