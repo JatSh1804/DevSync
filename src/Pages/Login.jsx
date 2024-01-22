@@ -11,18 +11,23 @@ function LoginPage() {
         var config = {
             method: 'POST',
             url: 'http://localhost:3002/Login',
-            // withCredentials: true,
+            withCredentials: true,
+
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Accept': 'Application/json'
             },
             data: { username, password }
         };
         await axios(config)
-            .then(res => console.log(JSON.stringify(res.data)))
+            .then(res => {
+                console.log(document.cookie);
+                console.log(JSON.stringify(res.data))
+            })
             .catch(err => console.log(err.response?.data.message));
     }
     return <>
-        <form action="https://localhost:3002/Login" method="POST">
+        <form>
             <input type="text" placeholder="User Id" value={username} onChange={e => setUsername(e.target.value)}></input>
             <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}></input>
             <input type="submit" value='Submit' onClick={handleLogin}></input>

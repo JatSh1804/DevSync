@@ -9,7 +9,7 @@ function SignupPage() {
         e.preventDefault();
         var config = {
             method: 'post',
-            url: 'http://localhost:3002/SignUp',
+            url: 'http://localhost:3002/Signup',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
@@ -17,11 +17,11 @@ function SignupPage() {
         };
         await axios(config)
             .then(res => res)
-            .catch(err => console.log(err));
+            .catch(err => console.log(err?.response?.data?.message));
 
     }
     return <>
-        <form method="POST" action="https://localhost:3002/SignUp">
+        <form>
             <input placeholder="Name" type="text" ></input>
             <input placeholder="Username" type="text" value={username} onChange={e => setUsername(e.target.value)}></input>
             <input placeholder="Password" type="password" value={password} onChange={e => setPassword(e.target.value)}></input>

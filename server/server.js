@@ -9,38 +9,49 @@ const path = require("path")
 const cors = require("cors");
 const axios = require("axios");
 const qs = require("qs");
-const bodyParser = require("body-parser")
 const PORT = process.env.PORT || 3002;
 const { authenticate } = require("./middleware/authenticate");
+const cookieParser = require("cookie-parser");
 const { SignUp } = require("./controller/Signup");
 const { Login } = require("./controller/Login");
 
+
 app.use(
-    cors({ origin: "http://localhost:5173" })
-);
+    cors({
+        origin: 'http://localhost:5173/Login',
+        methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+        credentials: true, // Enable credentials (cookies, authorization headers, etc.)
+        optionsSuccessStatus: 204
+    })
+)
+
+
 const io = new Server(server, { cors: { origin: '*' } });
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }))
-app.use(express.static('dist'));
-app.use((req, res, next) => {
+
+app.use(cookieParser())
+
+app.use(express.static('./dist'));
+app.get('*',(req, res, next) => {
     res.sendFile(path.join(__dirname, './dist', 'index.html'));
 });
 
 
-app.post("/SignUp", (req, res) => SignUp(req, res));
-app.post('/Login', (req, res) => Login(req, res));
+app.post("/Signup", (req, res) => SignUp(req, res));
+app.post("/Login", (req, res) => Login(req, res));
 
-// io.use(async (socket, next) => {
-//     authenticate(socket, next)
-//         .then((decoded) => {
-//             socket.decoded = decoded;
-//             console.log("decode=>", decoded)
-//             next()
-//         })
-//         .catch(err => { console.log(err.message), next(new Error(err.message)) })
-//     // console.log(verification)
-// })
+io.use(async (socket, next) => {
+    authenticate(socket, next)
+        .then((decoded) => {
+            socket.decoded = decoded;
+            console.log("decode=>", decoded)
+            next()
+        })
+        .catch(err => { console.log(err.message), next() })
+    // console.log(verification)
+})
 
 
 
@@ -142,7 +153,7 @@ io.on('connection', (socket) => {
         console.log('language=>', code);
         var config = {
             method: 'post',
-            url: process.env.COMPILE_URL ,
+            url: process.env.COMPILE_URL,
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },

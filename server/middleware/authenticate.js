@@ -1,8 +1,9 @@
 const jwt = require("jsonwebtoken")
 
-let secretKey = process.env.JWT_KEY ;
+let secretKey = process.env.JWT_KEY || 'devSync';
 function authenticate(socket, next) {
     const token = socket.handshake.auth.token;
+    console.log('token=>',token)
     return new Promise((resolve, reject) => {
 
         if (!token) {
