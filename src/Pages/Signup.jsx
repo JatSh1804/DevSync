@@ -2,8 +2,9 @@ import { useState } from "react";
 import axios from "axios";
 
 function SignupPage() {
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
+    const [Username, setUsername] = useState('');
+    const [Password, setPassword] = useState('');
+    const [Email, setEmail] = useState('');
 
     const handleSignUp = async (e) => {
         e.preventDefault();
@@ -13,18 +14,18 @@ function SignupPage() {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
-            data: { username, password }
+            data: { Email, Username, Password }
         };
         await axios(config)
             .then(res => res)
-            .catch(err => console.log(err?.response?.data?.message));
+            .catch(err => console.error(err?.response?.data?.message));
 
     }
     return <>
         <form>
-            <input placeholder="Name" type="text" ></input>
-            <input placeholder="Username" type="text" value={username} onChange={e => setUsername(e.target.value)}></input>
-            <input placeholder="Password" type="password" value={password} onChange={e => setPassword(e.target.value)}></input>
+            <input placeholder="Username" type="text" value={Username} onChange={e => setUsername(e.target.value)}></input>
+            <input placeholder="Email" type="text" value={Email} onChange={e => setEmail(e.target.value)}></input>
+            <input placeholder="Password" type="Password" value={Password} onChange={e => setPassword(e.target.value)}></input>
             <input type="submit" value='Submit' onClick={handleSignUp}></input>
         </form>
     </>

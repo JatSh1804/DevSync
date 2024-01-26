@@ -3,11 +3,12 @@ import axios from "axios";
 
 
 function LoginPage() {
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
+    const [Email, setEmail] = useState('');
+    const [Password, setPassword] = useState('');
 
     const handleLogin = async (e) => {
         e.preventDefault();
+        console.log(Email);
         var config = {
             method: 'POST',
             url: 'http://localhost:3002/Login',
@@ -17,19 +18,19 @@ function LoginPage() {
                 'Content-Type': 'application/json',
                 'Accept': 'Application/json'
             },
-            data: { username, password }
+            data: { Email, Password }
         };
         await axios(config)
             .then(res => {
                 console.log(document.cookie);
                 console.log(JSON.stringify(res.data))
             })
-            .catch(err => console.log(err.response?.data.message));
+            .catch(err => console.error(err.response?.data.message));
     }
     return <>
         <form>
-            <input type="text" placeholder="User Id" value={username} onChange={e => setUsername(e.target.value)}></input>
-            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)}></input>
+            <input type="text" placeholder="Email" value={Email} onChange={e => setEmail(e.target.value)}></input>
+            <input type="password" placeholder="Password" value={Password} onChange={e => setPassword(e.target.value)}></input>
             <input type="submit" value='Submit' onClick={handleLogin}></input>
         </form>
     </>

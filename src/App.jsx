@@ -4,6 +4,7 @@ import Homepage from './Pages/homepage';
 import Editorpage from "./Pages/Editorpage.jsx"
 import LoginPage from './Pages/Login.jsx';
 import SignupPage from "./Pages/Signup.jsx";
+import CreatePage from './Pages/CreatePage.jsx';
 export default function App() {
   return (
     <BrowserRouter>
@@ -13,6 +14,7 @@ export default function App() {
         <Route path='/Login' element={<LoginPage />}></Route>
         <Route path='/Signup' element={<SignupPage />}></Route>
         <Route path='/Account'></Route>
+        <Route path='/Create' element={<CreatePage />}></Route>
       </Routes>
     </BrowserRouter>
   )

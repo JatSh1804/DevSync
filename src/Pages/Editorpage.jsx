@@ -31,12 +31,20 @@ export default function Editorpage() {
     const [lastEdit, setlastEdit] = useState();
 
     const [Client, setClients] = useState([])
-    const [mode, setmode] = useState('js')
+    const [mode, setmode] = useState(['js', 'javascript'])
+    const modeRef = useRef();
 
 
     // const socket = io('http://localhost:3002', () => {});
-    useEffect(() => { console.log(msgArray) }, [msgArray])
     useEffect(() => {
+        console.log(mode)
+    }, [msgArray, mode])
+    useEffect(() => {
+        if (location.state == null) {
+            console.log("emtpy");
+            navigate('/', { state: { RoomId: queryRoom } });
+            return;
+        }
         const connect = async () => {
             socket.current = await socketinit();
             socket.current.on('connect_error', (err) => Toast.error("Not Able to connect right now!"));
@@ -53,10 +61,11 @@ export default function Editorpage() {
                 // Set a new timer to emit "Code Change" after 2 seconds of inactivity
                 changeTimer = setTimeout(() => {
                     if (changes.origin != 'setValue') {
-                        socket.current.emit("Code Change", { RoomId, username, code: instance.getValue() });
+                        socket.current.emit("Code Change", { RoomId, language: modeRef.current.options[modeRef.current.selectedIndex].getAttribute('name'), username, code: instance.getValue() });
                     }
                 }, 2000); // 2 seconds delay
             });
+
 
             socket.current.on("connect", () => {
                 console.log("Connected to the Server!")
@@ -91,7 +100,8 @@ export default function Editorpage() {
                     editorref.current.setCursor({ line: 1, ch: 5 })
                 })
                 socket.current.on("Result", ({ result }) => {
-                    console.log(result);
+                    console.log(result)
+                    Toast(result.output || result.error);
                 })
                 socket.current.on("message receive", ({ message, sender, username }) => {
                     console.log("client received", message)
@@ -105,17 +115,13 @@ export default function Editorpage() {
         };
         connect();
 
-        if (location.state == null) {
-            console.log("emtpy");
-            navigate('/', { state: { RoomId: queryRoom } });
-            return;
-        }
+
 
         const { RoomId, username } = location.state
         async function init() {
             editorref.current = Codemirror.fromTextArea(document.getElementById("codeeditor"), {
                 mode: {
-                    name: `${mode == 'js' ? 'javascript' : 'text/x-' + 'javascript'}`
+                    name: `${mode[0] == 'js' ? 'javascript' : 'text/x-' + 'javascript'}`
                     , json: true
                 },
                 theme: 'dracula',
@@ -150,7 +156,7 @@ export default function Editorpage() {
     }
     const compile = async (e) => {
         e.preventDefault();
-        socket.current.emit("Compile", { code: codeRef.current, RoomId, language: mode, input: "" })
+        socket.current.emit("Compile", { code: codeRef.current, RoomId, language: mode[0], input: "" })
     }
 
     // console.log(location.state)
@@ -159,10 +165,11 @@ export default function Editorpage() {
     return <><Toaster position="top-right" />
         <div className="wrapdiv">
             <div className="sidebar">
-                <select value={mode} onChange={e => { setmode([e.target.name, e.target.value]) }}>
-                    <option defaultChecked={true} value='javascript' name='js'>javascript</option>
+                <select ref={modeRef} onChange={e => { setmode([e.target.options[e.target.selectedIndex].getAttribute('name'), e.target.value]) }}>
+                    <option value='javascript' name='js'>javascript</option>
                     <option value='clike' name='java'>Java</option>
                     <option value='clike' name='cpp'>C++</option>
+                    <option value='python' name='py'>Python</option>
                 </select>
                 {lastEdit && <p>Last edit by {lastEdit}</p>}
 

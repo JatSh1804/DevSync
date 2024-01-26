@@ -51,6 +51,5 @@ export default function Homepage() {
             </p>
 
         </div>
-
     </>
 }

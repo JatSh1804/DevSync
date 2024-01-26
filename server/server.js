@@ -12,48 +12,71 @@ const qs = require("qs");
 const PORT = process.env.PORT || 3002;
 const { authenticate } = require("./middleware/authenticate");
 const cookieParser = require("cookie-parser");
-const { SignUp } = require("./controller/Signup");
-const { Login } = require("./controller/Login");
+const cookie = require("cookie")
+
+const { SignUp } = require("./config/Signup");
+const { Login } = require("./config/Login");
+const mongoose = require("mongoose");
 
 
 app.use(
     cors({
-        origin: 'http://localhost:5173/Login',
+        origin: 'http://localhost:5173',
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-        credentials: true, // Enable credentials (cookies, authorization headers, etc.)
-        optionsSuccessStatus: 204
+        credentials: true,
+        optionsSuccessStatus: 204,
     })
 )
 
 
-const io = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, {
+    cors: {
+        origin: 'http://localhost:5173',
+        credentials: true
+    }
+});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }))
 
 app.use(cookieParser())
 
-app.use(express.static('./dist'));
-app.get('*',(req, res, next) => {
-    res.sendFile(path.join(__dirname, './dist', 'index.html'));
-});
+// app.use(express.static('./dist'));
+// app.get('*', (req, res, next) => {
+//     res.sendFile(path.join(__dirname, './dist', 'index.html'));
+// });
 
 
 app.post("/Signup", (req, res) => SignUp(req, res));
 app.post("/Login", (req, res) => Login(req, res));
+app.post('/user', (req, res) => {
+    authenticate(req.headers.authorization.token)
+        .then(decoded => {
+            res.json({ loggedIn: true, ...decoded }).redirect('/room/', {})
+        })
+        .catch(err => { res.json({ loggedIn: false, ...err }) })
+})
 
 io.use(async (socket, next) => {
-    authenticate(socket, next)
+    // const cookies = cookie.parse(socket.request.headers.cookie || '');
+    // const token = cookies.token;
+    const token = cookie.parse(socket.handshake.headers.cookie || '').token
+    authenticate(token)
         .then((decoded) => {
             socket.decoded = decoded;
             console.log("decode=>", decoded)
             next()
         })
-        .catch(err => { console.log(err.message), next() })
+        .catch(err => {
+            console.log('error=>', err.message),
+                next(new Error("Token missing...."))
+            // next()
+        })
     // console.log(verification)
 })
 
-
+mongoose.connect(`mongodb+srv://jatin1804sharma:jatin1234@cluster0.9ynjhkt.mongodb.net/User`)
+    .then(() => { console.log('Connected!') });
 
 const Users = [];
 function AllConnectedUser(RoomId) {
@@ -90,7 +113,7 @@ sub.on("message", (channel, message) => {
             break;
         case "CODE":
             console.log("CODE")
-            io.to(channel).emit("Code Sync", { code: data.code, username: data.username });
+            io.to(channel).emit("Code Sync", { code: data.code, language: data.language, username: data.username });
             // io.sockets.sockets.get(data.socketId)?.broadcast.to(channel).emit("Code Sync", { code: data.code, username: data.username });
             console.log("getting code")
             break;
@@ -127,10 +150,10 @@ io.on('connection', (socket) => {
     })
 
 
-    socket.on("Code Change", async ({ RoomId, code, username }) => {
-        pub.set(`lastCode:${RoomId}`, JSON.stringify({ code, username, socketId: socket.id }))
+    socket.on("Code Change", async ({ RoomId, language, code, username }) => {
+        pub.set(`lastCode:${RoomId}`, JSON.stringify({ code, language, username, socketId: socket.id }))
 
-        await RedisPublish(RoomId, 'CODE', { username, code, socketId: socket.id })
+        await RedisPublish(RoomId, 'CODE', { username, language, code, socketId: socket.id })
         // await pub.publish(RoomId, JSON.stringify({ type: "CODE", username, code }))
         // console.log(socket.to())
     })
@@ -146,14 +169,14 @@ io.on('connection', (socket) => {
 
     socket.on("Compile", async ({ code, language, input, RoomId }) => {
         var data = qs.stringify({
-            code: 'val = int(input("Enter your value: ")) + 5\nprint(val)',
-            language: 'py',
+            code: code,
+            language: language,
             input: input || ''
         });
-        console.log('language=>', code);
+        console.log('language=>', language, code);
         var config = {
             method: 'post',
-            url: process.env.COMPILE_URL,
+            url: process.env.COMPILE_URL || 'http://localhost:3000',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
@@ -163,7 +186,7 @@ io.on('connection', (socket) => {
         await axios(config)
             .then((response) => {
                 // console.log('response=>', response.)
-                // io.in(RoomId).emit('Result', { result: response.data });
+                io.in(RoomId).emit('Result', { result: response.data });
                 console.log('response=>', (response));
             })
             .catch(function (error) {
