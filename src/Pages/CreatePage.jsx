@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Toast, { Toaster } from "react-hot-toast";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
+import { v4 as uuidV4 } from "uuid";
 
 export default function CreatePage() {
     const location = useLocation();
@@ -19,20 +20,32 @@ export default function CreatePage() {
         };
         if (!RoomId) { Toast.error('Enter Room Id'); return; }
         console.log(RoomId);
-        console.log(username);
+        // console.log(username);
         var config = {
             method: 'POST',
-            url: '/user',
+            url: 'http://localhost:3002/create',
             withCredentials: true,
+            data: { RoomId },
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
         };
         await axios(config)
-            .then(res => res)
-            .catch(err => console.error(err?.response?.data?.message));
+            .then(res => {
+                console.log(res)
+                if (res.data.Exists) {
+                    Toast.error(res.data.message)
+                } else {
+                    console.log("Room Created")
+                    navigate(`/room/${RoomId}`, { state: { RoomId: RoomId, username: username, email: res.data.Email, role: 'owner' } })
+                }
+            })
+            .catch(err => {
+                console.error('err=>', err?.response.data)
+                err?.response.data && Toast.error(err?.response.data)
+                // navigate(`/login`)
+            });
 
-        navigate(`/room/${RoomId}`, { state: { RoomId: RoomId, username } })
     };
 
     const RoomCreate = e => {

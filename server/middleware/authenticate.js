@@ -6,7 +6,7 @@ async function authenticate(token) {
     return new Promise((resolve, reject) => {
 
         if (!token) {
-            reject(new Error('Authentication error: Token missing'));
+            reject('Token missing');
         }
         jwt.verify(token, secretKey, (err, decoded) => {
             if (err) {

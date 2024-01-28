@@ -16,7 +16,7 @@ async function Login(req, response) {
                 console.log('datauser=>', res)
 
                 const token = jwt.sign({ id: res.id, Username: res.Username, Email: res.Email }, secret_key, { expiresIn: '1h' });
-                response.cookie('token', token, { httpOnly: true, maxAge: 600 * 1000 })
+                response.cookie('token', token, { httpOnly: true, maxAge: 60000 * 1000 })
                 console.log('Successful=>', token)
 
                 response.json({ message: 'Authentication successful' });
@@ -24,7 +24,6 @@ async function Login(req, response) {
                 response.status(401).json({ message: 'Invalid username or password' });
             }
             return res;
-
         })
         .catch(err => {
             console.log('error=>', err)

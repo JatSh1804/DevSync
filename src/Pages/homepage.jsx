@@ -20,7 +20,7 @@ export default function Homepage() {
         if (!RoomId) { Toast.error('Enter Room Id'); return; }
         console.log(RoomId);
         console.log(username);
-        navigate(`/room/${RoomId}`, { state: { RoomId: RoomId, username } })
+        navigate(`/room/${RoomId}`, { state: { RoomId: RoomId, username, role: 'member' } })
     };
 
     const RoomCreate = e => {
@@ -33,7 +33,7 @@ export default function Homepage() {
             duration: 2000,
             id: "roomid",
             // style: { backgroundColor: "lightgreen" },
-            // icon: '👏',
+            icon: '👏',
         })
     }
     return <><Toaster />

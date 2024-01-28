@@ -46,19 +46,50 @@ app.use(cookieParser())
 //     res.sendFile(path.join(__dirname, './dist', 'index.html'));
 // });
 
-
 app.post("/Signup", (req, res) => SignUp(req, res));
 app.post("/Login", (req, res) => Login(req, res));
 app.post('/user', (req, res) => {
-    authenticate(req.headers.authorization.token)
+    authenticate(req.headers?.authorization?.split(' ')[1] || req.cookies?.token)
         .then(decoded => {
-            res.json({ loggedIn: true, ...decoded }).redirect('/room/', {})
+            res.json({ loggedIn: true, ...decoded })
         })
-        .catch(err => { res.json({ loggedIn: false, ...err }) })
+        .catch(err => {
+            res.status(401).json({ loggedIn: false, ...err })
+        })
 })
+app.post('/create',
+    async (req, res) => {
+        try {
+            const { RoomId } = req.body;
+            console.log(RoomId)
+            await pub.exists(`room:${RoomId}`)
+                .then(response => {
+                    console.log('RoomDetails=>', response)
+                    if (response) {
+                        res.status(200).json({ Exists: true, message: 'Room Already Exists!' })
+                    }
+                    else {
+                        authenticate(req.cookies?.token)
+                            .then(async decoded => {
+                                res.status(200).json({ Exists: false, ...decoded, message: 'Successfull' })
+                            })
+                            .catch((err) => {
+                                console.log(err)
+                                res.status(401).send('Not logged in')
+                            })
+                    }
+                })
+        }
+        catch (error) {
+            res.send(new Error(error))
+            throw Error(error)
+        }
+
+    }
+)
 
 io.use(async (socket, next) => {
-    // const cookies = cookie.parse(socket.request.headers.cookie || '');
+    // const cookies = c ie.parse(socket.request.headers.cookie || '');
     // const token = cookies.token;
     const token = cookie.parse(socket.handshake.headers.cookie || '').token
     authenticate(token)
@@ -68,7 +99,7 @@ io.use(async (socket, next) => {
             next()
         })
         .catch(err => {
-            console.log('error=>', err.message),
+            console.log('error=>', err),
                 next(new Error("Token missing...."))
             // next()
         })
@@ -79,32 +110,45 @@ mongoose.connect(`mongodb+srv://jatin1804sharma:jatin1234@cluster0.9ynjhkt.mongo
     .then(() => { console.log('Connected!') });
 
 const Users = [];
-function AllConnectedUser(RoomId) {
-    return Array.from(io.sockets.adapter.rooms.get(RoomId) || []).map(
-        (socketId) => {
-            return {
-                socketId,
-                username: Users[socketId].username,
-            };
-        }
-    );
+
+async function AllConnectedUser(RoomId) {
+    let Alluser = await pub.hgetall(`room:${RoomId}:users`)
+        .then(res =>
+            Object.entries(res).map(([socketId, value]) => {
+                let [username, role] = value.split('/');
+                return { socketId, username, role }
+            })
+        )
+    return Alluser;
 };
 const CodeExpire = async (socket, timeout) => {
-    await pub.expire(`lastCode:${Users[socket.id].RoomId}`, timeout)
+    console.log('expire');
+    await pub.expire(`room:${Users[socket.id].RoomId}`, timeout)
+        .then(res => console.log('expire=>', res))
 }
+
 const RedisPublish = async (RoomId, type, data) => {
+    console.log(type)
     await pub.publish(RoomId, JSON.stringify({ type, ...data }))
 }
 
 
-sub.on("message", (channel, message) => {
+sub.on("message", async (channel, message) => {
     console.log("channel=>", channel)
     let data = JSON.parse(message)
     console.log(channel, "=>", data)
 
     switch (data.type) {
         case "JOIN":
-            io.in(channel).emit("Joined", { client: AllConnectedUser(data.RoomId), socketId: data.socket, username: data.username });
+            try {
+                AllConnectedUser(data.RoomId)
+                    .then(async res => {
+                        // console.log('allConnectedUser=>',)
+                        io.in(channel).emit("Joined", { client: res, socketId: data.socket, username: data.username, role: data.role, email: data.email });
+                    })
+            } catch (error) {
+                console.log(error)
+            }
             break;
 
         case "LEAVE":
@@ -115,30 +159,39 @@ sub.on("message", (channel, message) => {
             console.log("CODE")
             io.to(channel).emit("Code Sync", { code: data.code, language: data.language, username: data.username });
             // io.sockets.sockets.get(data.socketId)?.broadcast.to(channel).emit("Code Sync", { code: data.code, username: data.username });
-            console.log("getting code")
+            // console.log("getting code")
             break;
         case 'CHAT':
             io.in(channel).emit("message receive", { message: data.message, sender: data.sender, username: data.username })
+            break;
+        case 'COMPILE':
+            io.in(channel).emit('Result', { result: data.result });
+            break;
         default:
             break;
     }
 })
 io.on('connection', (socket) => {
-    socket.on("UserJoin", async ({ RoomId, username }) => {
+    socket.on("UserJoin", async ({ RoomId, username, email, role }) => {
         sub.subscribe(RoomId);
         Users[socket.id] = { username: username, RoomId: RoomId };
         socket.join(RoomId);
+        if (role == 'owner' || role == 'co-host') {
+            await pub.hsetnx(`room:${RoomId}`, 'info', JSON.stringify({ owner: email, role }))
+            await pub.hset(`room:${RoomId}`, 'socket', socket.id)
+        }
+        await pub.hset(`room:${RoomId}:users`, socket.id, `${username}/${role}`)
 
         console.log({ RoomId, username, socketid: socket.id })
         console.log(Users);
         // console.log(client)
-        await RedisPublish(RoomId, "JOIN", { RoomId, username, socket: socket.id })
+        await RedisPublish(RoomId, "JOIN", { RoomId, username, socket: socket.id, email, role })
         // await pub.publish(RoomId, JSON.stringify({ type: "JOIN", RoomId, username, socket: socket.id }))
         try {
-            const lastCode = await pub.get(`lastCode:${RoomId}`)
+            const lastCode = await pub.hget(`room:${RoomId}`, 'lastCode')
                 .then(res => JSON.parse(res))
                 .then(res => {
-                    pub.persist(`lastCode:${RoomId}`)
+                    pub.persist(`room:${RoomId}`)
                     console.log(res.code);
                     socket.emit("Code Sync", { code: res.code, username: res.username });
                     return res;
@@ -151,7 +204,8 @@ io.on('connection', (socket) => {
 
 
     socket.on("Code Change", async ({ RoomId, language, code, username }) => {
-        pub.set(`lastCode:${RoomId}`, JSON.stringify({ code, language, username, socketId: socket.id }))
+        await pub.hset(`room:${RoomId}`, 'lastCode', JSON.stringify({ code, language, username, socketId: socket.id }))
+        console.log("Getting code ")
 
         await RedisPublish(RoomId, 'CODE', { username, language, code, socketId: socket.id })
         // await pub.publish(RoomId, JSON.stringify({ type: "CODE", username, code }))
@@ -184,9 +238,9 @@ io.on('connection', (socket) => {
         };
 
         await axios(config)
-            .then((response) => {
+            .then(async (response) => {
                 // console.log('response=>', response.)
-                io.in(RoomId).emit('Result', { result: response.data });
+                await RedisPublish(RoomId, 'COMPILE', { result: response.data })
                 console.log('response=>', (response));
             })
             .catch(function (error) {
@@ -195,18 +249,19 @@ io.on('connection', (socket) => {
     })
 
     socket.on('disconnect', async (Room, reason) => {
-        // console.log(Users[socket.id]);
-        // console.log('Reason:', reason)
-        console.log('room>', Users[socket.id]?.RoomId);
-        // sub.quit();
-        // pub.quit();
+        const User = Users[socket.id];
+        // console.log('room>', Users?.RoomId);
         try {
-            await RedisPublish(Users[socket.id].RoomId, 'LEAVE', { socketId: socket.id, User: Users[socket.id] })
-
-            console.log("Userleave Emitted!")
-            if (!AllConnectedUser || AllConnectedUser(Room).length == 0) {
-                CodeExpire(socket, 600)
-            }
+            await RedisPublish(User?.RoomId, 'LEAVE', { socketId: socket.id, User: User })
+            await pub.hdel(`room:${User.RoomId}:users`, socket.id)
+            // console.log("AllUser=>", await AllConnectedUser(User.RoomId).length)
+            await AllConnectedUser(User.RoomId)
+                .then(data => {
+                    if (data.length == 0) {
+                        console.log('expire1')
+                        CodeExpire(socket, 300)
+                    }
+                })
             delete Users[socket.id]
         } catch (error) {
             console.log('Socket not found!')

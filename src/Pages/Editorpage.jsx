@@ -32,54 +32,84 @@ export default function Editorpage() {
 
     const [Client, setClients] = useState([])
     const [mode, setmode] = useState(['js', 'javascript'])
+    const [role, setRole] = useState();
+    const [access, setAccess] = useState();
     const modeRef = useRef();
 
 
     // const socket = io('http://localhost:3002', () => {});
-    useEffect(() => {
-        console.log(mode)
-    }, [msgArray, mode])
+
+    useEffect(() => { console.log(Client) }, [Client])
+
     useEffect(() => {
         if (location.state == null) {
             console.log("emtpy");
             navigate('/', { state: { RoomId: queryRoom } });
             return;
         }
+        async function init() {
+            editorref.current = Codemirror.fromTextArea(document.getElementById("codeeditor"), {
+                mode: {
+                    name: `${mode[0] == 'js' ? 'javascript' : 'text/x-' + 'javascript'}`
+                    , json: true
+                },
+                theme: 'dracula',
+                autoCloseBrackets: true,
+                autoclosetags: true,
+                lineNumbers: true,
+                autoRefresh: true,
+                dragDrop: true,
+                autofocus: true,
+                extraKeys: {
+                    "Ctrl-Space": "autocomplete",
+                },
+            })
+        };
+
         const connect = async () => {
+            init();
             socket.current = await socketinit();
             socket.current.on('connect_error', (err) => Toast.error("Not Able to connect right now!"));
             socket.current.on('connect_failed', (err) => Toast.error("Not Able to connect right now!"));
 
             let changeTimer;
 
-            editorref.current.on('change', (instance, changes) => {
+            // if (access) {
+            editorref.current?.on('change', (instance, changes) => {
                 codeRef.current = instance.getValue();
-
                 // Clear the existing timer
                 clearTimeout(changeTimer);
-
                 // Set a new timer to emit "Code Change" after 2 seconds of inactivity
                 changeTimer = setTimeout(() => {
                     if (changes.origin != 'setValue') {
+                        console.log("emitting code")
                         socket.current.emit("Code Change", { RoomId, language: modeRef.current.options[modeRef.current.selectedIndex].getAttribute('name'), username, code: instance.getValue() });
                     }
                 }, 2000); // 2 seconds delay
             });
 
-
             socket.current.on("connect", () => {
                 console.log("Connected to the Server!")
-                socket.current.emit('UserJoin', { RoomId: RoomId, username: username })
+                socket.current.emit('UserJoin', { RoomId, username, email, role })
                 // console.log(socket.id)
 
-                socket.current.on("Joined", ({ client, socketId, username }) => {
-                    console.log(socket.current.id)
+                socket.current.on("Joined", ({ client, socketId, username, role }) => {
+                    console.log(role)
                     setClients(client);
-                    (location.state?.username == username) ?
-                        Toast.success("You joined a Room!") :
+                    // console.log(Client);
+                    (socket.current?.id == socketId) ? (() => {
+                        Toast.success("You joined a Room!");
+                        if (role == 'owner' || role == 'cohost') {
+                            setAccess(true);
+                            console.log('editor=>', editorref.current)
+                        } else {
+                            editorref.current.setOption('readOnly', 'nocursor')
+                        }
+                        setRole(role);
+                        // setAccess((role == 'owner' || role == 'cohost'))
+                    })() :
                         Toast.success(`${username} Joined the Room!`);
                     if (codeRef.current) {
-                        // socket.current.emit("Code Change", { RoomId, code: codeRef.current })
                         console.log(codeRef.current);
                     }
                 });
@@ -113,29 +143,21 @@ export default function Editorpage() {
             socket.current.on("connection_failed", () => { Toast.error("No Connection established!") })
 
         };
+
         connect();
 
+        const { RoomId, username, email, role } = location.state
+        console.log('role=>', role)
 
-
-        const { RoomId, username } = location.state
-        async function init() {
-            editorref.current = Codemirror.fromTextArea(document.getElementById("codeeditor"), {
-                mode: {
-                    name: `${mode[0] == 'js' ? 'javascript' : 'text/x-' + 'javascript'}`
-                    , json: true
-                },
-                theme: 'dracula',
-                autoCloseBrackets: true,
-                autoclosetags: true,
-                lineNumbers: true,
-                autoRefresh: true,
-                dragDrop: true,
-                autofocus: true
-            })
-        };
-        init();
         return () => { socket.current.disconnect(); socket.current.off("Joined") }
     }, []);
+
+
+    useEffect(() => {
+        const { username, role } = location.state;
+
+        console.log(access)
+    }, [role])
 
     const sendMsg = (e) => {
         e.preventDefault();
@@ -165,7 +187,7 @@ export default function Editorpage() {
     return <><Toaster position="top-right" />
         <div className="wrapdiv">
             <div className="sidebar">
-                <select ref={modeRef} onChange={e => { setmode([e.target.options[e.target.selectedIndex].getAttribute('name'), e.target.value]) }}>
+                <select disabled={!access} ref={modeRef} onChange={e => { setmode([e.target.options[e.target.selectedIndex].getAttribute('name'), e.target.value]) }}>
                     <option value='javascript' name='js'>javascript</option>
                     <option value='clike' name='java'>Java</option>
                     <option value='clike' name='cpp'>C++</option>
@@ -176,20 +198,20 @@ export default function Editorpage() {
                 {Client.map(item => { return item.username; })}
 
                 <ul>
-                    {msgArray.map((item) => { return <li className={item.type}>{item.username}:{item.message}</li> })}
+                    {msgArray.map((item, index) => { return <li key={index} className={item.type}>{item.username}:{item.message}</li> })}
                 </ul>
                 <form className="chat">
                     <input type="text" onChange={e => { setMessage(e.target.value) }} placeholder="Type Message..." value={message}></input>
                     <input type="submit" onClick={sendMsg} value={"send"}></input>
                 </form>
                 <div style={{ display: 'grid', gap: '10px', marginBottom: 10 }}>
-                    <input type="button" className="success" onClick={compile} value="Run" />
+                    <input type="button" className="success" onClick={compile} disabled={!access} value="Run" />
                     <input style={{}} type="button" className="success" onClick={copyclipboard} value={'Copy Room Id'}></input>
                     <input style={{}} type="button" className="error" onClick={leaveroom} value={'Leave Room'}></input>
                 </div>
             </div>
             <div className="realtimeeditor">
-                <textarea id="codeeditor"></textarea>
+                <textarea disabled={access} id="codeeditor"></textarea>
             </div>
         </div>
 
