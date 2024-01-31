@@ -36,6 +36,15 @@ export default function Editorpage() {
     const [access, setAccess] = useState();
     const modeRef = useRef();
 
+    const handleRoleAccess = (role) => {
+        if (role == 'owner' || role == 'cohost') {
+            setAccess(true);
+            editorref.current.setOption('readOnly', false)
+            console.log('editor=>', editorref.current)
+        } else {
+            editorref.current.setOption('readOnly', 'nocursor')
+        }
+    }
 
     // const socket = io('http://localhost:3002', () => {});
 
@@ -69,7 +78,7 @@ export default function Editorpage() {
         const connect = async () => {
             init();
             socket.current = await socketinit();
-            socket.current.on('connect_error', (err) => Toast.error("Not Able to connect right now!"));
+            socket.current.on('connect_error', (err) => Toast.error(err.message));
             socket.current.on('connect_failed', (err) => Toast.error("Not Able to connect right now!"));
 
             let changeTimer;
@@ -99,12 +108,8 @@ export default function Editorpage() {
                     // console.log(Client);
                     (socket.current?.id == socketId) ? (() => {
                         Toast.success("You joined a Room!");
-                        if (role == 'owner' || role == 'cohost') {
-                            setAccess(true);
-                            console.log('editor=>', editorref.current)
-                        } else {
-                            editorref.current.setOption('readOnly', 'nocursor')
-                        }
+
+                        handleRoleAccess(role);
                         setRole(role);
                         // setAccess((role == 'owner' || role == 'cohost'))
                     })() :
@@ -139,6 +144,12 @@ export default function Editorpage() {
                     setmsgArray(prev => { return [...prev, { sender, message, username }] });
                     console.log(msgArray);
                 })
+                socket.current.on("PROMOTED", ({ role }) => {
+                    console.log('PROMOTED')
+                    Toast.success(`Promoted to ${role}!`)
+                    handleRoleAccess(role)
+                    setRole(role)
+                })
             })
             socket.current.on("connection_failed", () => { Toast.error("No Connection established!") })
 
@@ -154,15 +165,13 @@ export default function Editorpage() {
 
 
     useEffect(() => {
-        const { username, role } = location.state;
-
-        console.log(access)
+        // handleRoleAccess(role)
     }, [role])
 
     const sendMsg = (e) => {
         e.preventDefault();
         if (message == '') { Toast.error('Message field cannot be empty!'); return; }
-        socket.current.emit("chat message", { RoomId: RoomId, message: message, sender: socket.current.id, username: location.state.username });
+        socket.current.emit("chat message", { RoomId, message, sender: socket.current.id, username: location.state.username });
         console.log('emitting...')
         setMessage('');
     }
@@ -174,13 +183,18 @@ export default function Editorpage() {
     }
     const copyclipboard = async () => {
         Toast.success("Room ID copied!")
-        await navigator.clipboard.writeText(RoomId)
+        await navigator.clipboard.writeText(RoomId, socket.socket.current.id)
     }
     const compile = async (e) => {
         e.preventDefault();
         socket.current.emit("Compile", { code: codeRef.current, RoomId, language: mode[0], input: "" })
     }
-
+    const handlePromote = (e) => {
+        console.log(e.target)
+        if (role == 'owner' && access) {
+            socket.current.emit('PROMOTE', { RoomId, socketId: e.target.getAttribute('name'), role: 'cohost' })
+        }
+    }
     // console.log(location.state)
     // console.log(mode)
 
@@ -195,7 +209,9 @@ export default function Editorpage() {
                 </select>
                 {lastEdit && <p>Last edit by {lastEdit}</p>}
 
-                {Client.map(item => { return item.username; })}
+                {<ul onClick={(role == 'owner' && access) && handlePromote}>
+                    {Client.map(item => <p name={item.socketId} >{item.username}</p>)}
+                </ul>}
 
                 <ul>
                     {msgArray.map((item, index) => { return <li key={index} className={item.type}>{item.username}:{item.message}</li> })}
@@ -213,7 +229,7 @@ export default function Editorpage() {
             <div className="realtimeeditor">
                 <textarea disabled={access} id="codeeditor"></textarea>
             </div>
-        </div>
+        </div >
 
     </>
 }

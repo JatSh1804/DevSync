@@ -3,6 +3,7 @@ import "./homepage.css"
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import { v4 as uuidV4 } from "uuid"
 import Toast, { Toaster } from "react-hot-toast"
+import axios from "axios";
 
 export default function Homepage() {
     const location = useLocation();
@@ -12,7 +13,7 @@ export default function Homepage() {
     const [RoomId, setRoomID] = useState(queryRoom.get('room') || location?.state?.RoomId || '');
     const [username, setUsername] = useState('');
 
-    const onSubmit = e => {
+    const onSubmit = async e => {
         e.preventDefault();
         if (!username) {
             Toast.error(`Enter User Name`); return;
@@ -20,7 +21,25 @@ export default function Homepage() {
         if (!RoomId) { Toast.error('Enter Room Id'); return; }
         console.log(RoomId);
         console.log(username);
-        navigate(`/room/${RoomId}`, { state: { RoomId: RoomId, username, role: 'member' } })
+        var config = {
+            method: 'POST',
+            url: 'http://localhost:3002/Room',
+            withCredentials: true,
+            data: { RoomId },
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+        };
+        await axios(config)
+            .then(res => {
+                // console.log(res);
+                if (res.data.Exists) {
+                    navigate(`/room/${RoomId}`, { state: { RoomId: RoomId, username, role: 'member' } })
+                } else { Toast.error(res.data.message) }
+            })
+            .catch(error => {
+                Toast.error(error.response?.data || error.message)
+            })
     };
 
     const RoomCreate = e => {

@@ -57,36 +57,38 @@ app.post('/user', (req, res) => {
             res.status(401).json({ loggedIn: false, ...err })
         })
 })
-app.post('/create',
-    async (req, res) => {
-        try {
-            const { RoomId } = req.body;
-            console.log(RoomId)
-            await pub.exists(`room:${RoomId}`)
-                .then(response => {
-                    console.log('RoomDetails=>', response)
-                    if (response) {
-                        res.status(200).json({ Exists: true, message: 'Room Already Exists!' })
-                    }
-                    else {
-                        authenticate(req.cookies?.token)
-                            .then(async decoded => {
-                                res.status(200).json({ Exists: false, ...decoded, message: 'Successfull' })
-                            })
-                            .catch((err) => {
-                                console.log(err)
-                                res.status(401).send('Not logged in')
-                            })
-                    }
-                })
-        }
-        catch (error) {
-            res.send(new Error(error))
-            throw Error(error)
-        }
-
-    }
+app.post('/Room',
+    (req, res) => GetRoom(req, res)
 )
+async function GetRoom(req, res) {
+    try {
+        const { RoomId, Typeype } = req.body;
+        console.log(RoomId)
+        // if (Type) {
+        authenticate(req.cookies?.token)
+            .then(async decoded => {
+                await pub.exists(`room:${RoomId}`)
+                    .then(response => {
+                        console.log('RoomDetails=>', response)
+                        if (response) {
+                            res.status(200).json({ Exists: true, message: 'Room Exists!' })
+                        }
+                        else {
+                            res.status(200).json({ Exists: false, ...decoded, message: 'Room Does not Exists!' })
+                        }
+                    })
+            })
+            .catch((err) => {
+                console.log(err)
+                res.status(401).send('Not logged in')
+            })
+        // }
+    }
+    catch (error) {
+        res.send(new Error(error))
+        throw Error(error)
+    }
+}
 
 io.use(async (socket, next) => {
     // const cookies = c ie.parse(socket.request.headers.cookie || '');
@@ -100,7 +102,7 @@ io.use(async (socket, next) => {
         })
         .catch(err => {
             console.log('error=>', err),
-                next(new Error("Token missing...."))
+                next(new Error(err))
             // next()
         })
     // console.log(verification)
@@ -128,7 +130,7 @@ const CodeExpire = async (socket, timeout) => {
 }
 
 const RedisPublish = async (RoomId, type, data) => {
-    console.log(type)
+    // console.log(type)
     await pub.publish(RoomId, JSON.stringify({ type, ...data }))
 }
 
@@ -167,19 +169,22 @@ sub.on("message", async (channel, message) => {
         case 'COMPILE':
             io.in(channel).emit('Result', { result: data.result });
             break;
+        case 'PROMOTED':
+            io.to(data.socketId).emit('PROMOTED', { role: data.role });
         default:
             break;
     }
 })
 io.on('connection', (socket) => {
     socket.on("UserJoin", async ({ RoomId, username, email, role }) => {
-        sub.subscribe(RoomId);
-        Users[socket.id] = { username: username, RoomId: RoomId };
-        socket.join(RoomId);
-        if (role == 'owner' || role == 'co-host') {
+        console.log('USERJOINED')
+        if (role == 'owner' || role == 'cohost') {
             await pub.hsetnx(`room:${RoomId}`, 'info', JSON.stringify({ owner: email, role }))
             await pub.hset(`room:${RoomId}`, 'socket', socket.id)
         }
+        sub.subscribe(RoomId);
+        Users[socket.id] = { username, RoomId };
+        socket.join(RoomId);
         await pub.hset(`room:${RoomId}:users`, socket.id, `${username}/${role}`)
 
         console.log({ RoomId, username, socketid: socket.id })
@@ -221,6 +226,11 @@ io.on('connection', (socket) => {
 
     });
 
+    socket.on("PROMOTE", async ({ RoomId, socketId, role }) => {
+        if (socket.id != socketId) {
+            RedisPublish(RoomId, 'PROMOTED', { role, socketId })
+        }
+    })
     socket.on("Compile", async ({ code, language, input, RoomId }) => {
         var data = qs.stringify({
             code: code,
@@ -230,7 +240,7 @@ io.on('connection', (socket) => {
         console.log('language=>', language, code);
         var config = {
             method: 'post',
-            url: process.env.COMPILE_URL || 'http://localhost:3000',
+            url: process.env.COMPILE_URL || 'https://codex-api.fly.dev',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
