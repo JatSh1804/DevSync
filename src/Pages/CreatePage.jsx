@@ -23,7 +23,7 @@ export default function CreatePage() {
         // console.log(username);
         var config = {
             method: 'POST',
-            url: 'http://localhost:3002/Room',
+            url: '/Room',
             withCredentials: true,
             data: { RoomId },
             headers: {
