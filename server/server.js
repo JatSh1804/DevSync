@@ -41,10 +41,10 @@ app.use(express.urlencoded({ extended: false }))
 
 app.use(cookieParser())
 
-// app.use(express.static('./dist'));
-// app.get('*', (req, res, next) => {
-//     res.sendFile(path.join(__dirname, './dist', 'index.html'));
-// });
+app.use(express.static('./dist'));
+app.get('*', (req, res, next) => {
+    res.sendFile(path.join(__dirname, './dist', 'index.html'));
+});
 
 app.post("/Signup", (req, res) => SignUp(req, res));
 app.post("/Login", (req, res) => Login(req, res));
