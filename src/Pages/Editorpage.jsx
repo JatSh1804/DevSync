@@ -9,9 +9,28 @@ import "codemirror/addon/edit/closetag";
 import "codemirror/addon/edit/closebrackets";
 import "codemirror/addon/display/autorefresh"
 import "./EditorPage.css";
-import { io } from "socket.io-client";
 import { socketinit } from "../socket";
 import Toast, { Toaster } from "react-hot-toast";
+import {
+    Menu,
+    MenuButton,
+    MenuList,
+    MenuItem,
+    Drawer,
+    DrawerBody,
+    DrawerFooter,
+    DrawerHeader,
+    DrawerOverlay,
+    DrawerContent,
+    DrawerCloseButton,
+    useDisclosure,
+    Input,
+    Box,
+} from '@chakra-ui/react'
+import { Select } from '@chakra-ui/react'
+
+import { AiOutlineArrowDown, AiOutlineEllipsis, AiOutlineInfoCircle, AiOutlineSend } from "react-icons/ai";
+import { HiMiniUserGroup } from "react-icons/hi2";
 
 
 export default function Editorpage() {
@@ -35,6 +54,9 @@ export default function Editorpage() {
     const [role, setRole] = useState();
     const [access, setAccess] = useState();
     const modeRef = useRef();
+    //Handling the Drawer opening for Members.
+    const { isOpen, onOpen, onClose } = useDisclosure()
+    const btnRef = React.useRef()
 
     const handleRoleAccess = (role) => {
         if (role == 'owner' || role == 'cohost') {
@@ -48,9 +70,10 @@ export default function Editorpage() {
 
     // const socket = io('http://localhost:3002', () => {});
 
-    useEffect(() => { console.log(Client) }, [Client])
+    useEffect(() => { }, [Client])
 
     useEffect(() => {
+        const { RoomId, username, email, role } = location.state
         if (location.state == null) {
             console.log("emtpy");
             navigate('/', { state: { RoomId: queryRoom } });
@@ -76,11 +99,12 @@ export default function Editorpage() {
         };
 
         const connect = async () => {
+
             init();
             socket.current = await socketinit();
             socket.current.on('connect_error', (err) => Toast.error(err.message));
             socket.current.on('connect_failed', (err) => Toast.error("Not Able to connect right now!"));
-
+            console.log("Socket current=>", socket.current)
             let changeTimer;
 
             // if (access) {
@@ -118,6 +142,10 @@ export default function Editorpage() {
                         console.log(codeRef.current);
                     }
                 });
+                socket.current.on("ROLE", ({ role, access }) => {
+                    handleRoleAccess(role);
+                    setRole(role);
+                })
 
                 socket.current.on("Userleave", ({ User, socketId }) => {
                     console.log(`${User.username} left...`)
@@ -132,7 +160,7 @@ export default function Editorpage() {
                     setlastEdit(code.username);
                     editorref.current.setValue(code.code);
                     // editorref.current.focus();
-                    editorref.current.setCursor({ line: 1, ch: 5 })
+                    editorref.current.setCursor(editorref.current.lineCount(), 0)
                 })
                 socket.current.on("Result", ({ result }) => {
                     console.log(result)
@@ -146,9 +174,9 @@ export default function Editorpage() {
                 })
                 socket.current.on("PROMOTED", ({ role }) => {
                     console.log('PROMOTED')
-                    Toast.success(`Promoted to ${role}!`)
                     handleRoleAccess(role)
                     setRole(role)
+                        (role == 'cohost' && Toast.success(`Promoted to Co-Host!`));
                 })
             })
             socket.current.on("connection_failed", () => { Toast.error("No Connection established!") })
@@ -157,16 +185,25 @@ export default function Editorpage() {
 
         connect();
 
-        const { RoomId, username, email, role } = location.state
-        console.log('role=>', role)
+
+        console.log('role=>', email)
 
         return () => { socket.current.disconnect(); socket.current.off("Joined") }
     }, []);
 
 
     useEffect(() => {
-        // handleRoleAccess(role)
-    }, [role])
+        console.log("ModeChange", mode[0])
+        switch (mode[0]) {
+            case 'js':
+                editorref.current.setValue("let text = `Hello World!`; \n console.log(text)")
+                break;
+            case 'java':
+                editorref.current.setValue("/* HelloWorld.java\n */\n\npublic class HelloWorld\n{\n…rgs) {\n\t\tSystem.out.println('Hello World!');\n\t}\n}")
+            default:
+                break;
+        }
+    }, [mode])
 
     const sendMsg = (e) => {
         e.preventDefault();
@@ -192,7 +229,7 @@ export default function Editorpage() {
     const handlePromote = (e) => {
         console.log(e.target)
         if (role == 'owner' && access) {
-            socket.current.emit('PROMOTE', { RoomId, socketId: e.target.getAttribute('name'), role: 'cohost' })
+            socket.current.emit('PROMOTE', { RoomId, socketId: e.target.getAttribute('name'), role })
         }
     }
     // console.log(location.state)
@@ -201,25 +238,33 @@ export default function Editorpage() {
     return <><Toaster position="top-right" />
         <div className="wrapdiv">
             <div className="sidebar">
-                <select disabled={!access} ref={modeRef} onChange={e => { setmode([e.target.options[e.target.selectedIndex].getAttribute('name'), e.target.value]) }}>
-                    <option value='javascript' name='js'>javascript</option>
-                    <option value='clike' name='java'>Java</option>
-                    <option value='clike' name='cpp'>C++</option>
-                    <option value='python' name='py'>Python</option>
-                </select>
+                <div className="controls">
+                    <AiOutlineInfoCircle className="icons info" />
+                    <HiMiniUserGroup className="icons users" ref={btnRef} onClick={onOpen} />
+
+                </div>
+                <div className="selectDiv">
+                    <Select disabled={!access} ref={modeRef} onChange={e => { setmode([e.target.options[e.target.selectedIndex].getAttribute('name'), e.target.value]) }}>
+                        <option value='javascript' name='js'>javascript</option>``
+                        <option value='clike' name='java'>Java</option>
+                        <option value='clike' name='cpp'>C++</option>
+                        <option value='python' name='py'>Python</option>
+                    </Select>
+                </div>
                 {lastEdit && <p>Last edit by {lastEdit}</p>}
 
-                {<ul onClick={(role == 'owner' && access) && handlePromote}>
-                    {Client.map(item => <p name={item.socketId} >{item.username}</p>)}
-                </ul>}
-
-                <ul>
-                    {msgArray.map((item, index) => { return <li key={index} className={item.type}>{item.username}:{item.message}</li> })}
-                </ul>
-                <form className="chat">
-                    <input type="text" onChange={e => { setMessage(e.target.value) }} placeholder="Type Message..." value={message}></input>
-                    <input type="submit" onClick={sendMsg} value={"send"}></input>
-                </form>
+                <div className="Chatbox">
+                    <ul>
+                        {msgArray.map((item, index) => { return <li key={index} name={item.sender}>{item.username}:{item.message}</li> })}
+                    </ul>
+                    <form className="chat">
+                        <div className="textbox flex">
+                            <input type="text" className="message" onChange={e => { setMessage(e.target.value) }} placeholder="Type Message..." value={message}></input>
+                            <label htmlFor="send" className="sendicon"><AiOutlineSend size={'30px'} fontSize={'1000'} /></label>
+                            <input type="submit" id="send" className="send" onClick={sendMsg} value={"send"}></input>
+                        </div>
+                    </form>
+                </div>
                 <div style={{ display: 'grid', gap: '10px', marginBottom: 10 }}>
                     <input type="button" className="success" onClick={compile} disabled={!access} value="Run" />
                     <input style={{}} type="button" className="success" onClick={copyclipboard} value={'Copy Room Id'}></input>
@@ -229,7 +274,51 @@ export default function Editorpage() {
             <div className="realtimeeditor">
                 <textarea disabled={access} id="codeeditor"></textarea>
             </div>
-        </div >
+        </div>
+        <Drawer
+            isOpen={isOpen}
+            placement='right'
+            onClose={onClose}
+            finalFocusRef={btnRef}
+        >
+            <DrawerOverlay />
+            <DrawerContent background={'rgb(3 7 18)'}>
+                <DrawerCloseButton />
+                <DrawerHeader>People in Room</DrawerHeader>
+
+                <DrawerBody>
+                    <Input placeholder='Search People...' marginBottom={'20px'} />
+                    <Box height={'60%'} border={'1px solid grey'} borderRadius={'10px'}>
+                        {<ul>
+                            {Client.map(item => <div className="userinfo" name={item.socketId}>{item.username}
+                                <Menu>
+                                    <MenuButton
+                                        aria-label='Options'
+                                        variant='outline'
+                                        p={0}
+                                        fontSize={'30px'}
+                                        fontWeight={400}
+                                    ><AiOutlineEllipsis /></MenuButton>
+                                    <MenuList background={''}>
+                                        <MenuItem onClick={(role == 'owner' && access) && handlePromote} background={'transparent'} name={item.socketId} color={'rgb(99,198,99)'} backdropBlur={'10px'} icon={<AiOutlineArrowDown />} command='⌘T'>
+                                            Promo to Co-Host
+                                        </MenuItem>
+                                        <MenuItem background={'transparent'} backdropBlur={'10px'} icon={<AiOutlineArrowDown />} command='⌘T'>
+                                            New Tab
+                                        </MenuItem>
+                                        <MenuItem background={'transparent'} backdropBlur={'10px'} icon={<AiOutlineArrowDown />} command='⌘T'>
+                                            New Tab
+                                        </MenuItem>
+                                    </MenuList>
+                                </Menu>
+                            </div>)}
+                        </ul>}
+                    </Box>
+                </DrawerBody>
+                <DrawerFooter>
+                </DrawerFooter>
+            </DrawerContent>
+        </Drawer>
 
     </>
 }

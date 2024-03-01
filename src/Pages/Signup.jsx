@@ -1,7 +1,8 @@
 import { useState } from "react";
 import axios from "axios";
-
+import { useLocation ,Link} from "react-router-dom";
 function SignupPage() {
+    const location = useLocation();
     const [Username, setUsername] = useState('');
     const [Password, setPassword] = useState('');
     const [Email, setEmail] = useState('');
@@ -22,12 +23,13 @@ function SignupPage() {
 
     }
     return <>
-        <form>
+        <form className="homeForm">
             <input placeholder="Username" type="text" value={Username} onChange={e => setUsername(e.target.value)}></input>
             <input placeholder="Email" type="text" value={Email} onChange={e => setEmail(e.target.value)}></input>
             <input placeholder="Password" type="Password" value={Password} onChange={e => setPassword(e.target.value)}></input>
-            <input type="submit" value='Submit' onClick={handleSignUp}></input>
+            <input className="success" type="submit" value='Submit' onClick={handleSignUp}></input>
         </form>
+        <Link to="/login" state={location.state} alt="Login">Login</Link>
     </>
 }
 export default SignupPage;

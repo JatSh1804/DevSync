@@ -1,28 +1,41 @@
 .Wrapper {
-    margin: auto;
+    padding: 80px 10vw 0;
+    height: 100vh;
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+}
+
+.Wrapper div {
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    justify-content: center;
+}
+
+.homeForm {
+    /* margin: auto; */
+    display: flex;
+    padding: 20px;
+    flex-direction: column;
+    justify-items: center;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+}
+
+.homeForm input {
     width: 60%;
-    padding: 30px;
+    min-width: 145px;
+    transition: box-shadow 0.33s ease;
 }
 
-button.link {
-    background: transparent;
-    border: 0;
-    padding: 0;
-    display: inline;
-    position: relative;
-    color: rgb(136, 239, 136);
+.homeForm input:autofill {
+    background-color: transparent;
 }
 
-button.link::before {
-    content: '';
-    position: absolute;
-    width: 0;
-    height: 2px;
-    background-color: rgb(136, 239, 136);
-    transition: width  0.3s ease;
-    bottom: 0;
-}
-
-button.link:hover::before {
-    width: 100%;;
+.homeForm input:focus-visible {
+    /* outline: 2px rgb(99,198,99) solid;
+    outline-offset: 1px; */
+    box-shadow: 5px 5px;
 }

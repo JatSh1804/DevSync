@@ -5,6 +5,7 @@ const secret_key = process.env.SECRET_KEY || 'devsync';
 
 const { GetCred } = require('../controller/db')
 
+const maxAge = 360000 * 1000
 async function Login(req, response) {
     const { Email, Password } = req.body;
     console.log('Email=>', Email, Password)
@@ -16,7 +17,8 @@ async function Login(req, response) {
                 console.log('datauser=>', res)
 
                 const token = jwt.sign({ id: res.id, Username: res.Username, Email: res.Email }, secret_key, { expiresIn: '1h' });
-                response.cookie('token', token, { httpOnly: true, maxAge: 60000 * 1000 })
+                response.cookie('token', token, { httpOnly: true, maxAge, Secure: true })
+                response.cookie('User', { Username: res.Username, Email: res.Email }, { maxAge, })
                 console.log('Successful=>', token)
 
                 response.json({ message: 'Authentication successful' });

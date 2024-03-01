@@ -3,6 +3,7 @@ import Toast, { Toaster } from "react-hot-toast";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { v4 as uuidV4 } from "uuid";
+import { Link } from "react-router-dom"
 
 export default function CreatePage() {
     const location = useLocation();
@@ -37,11 +38,14 @@ export default function CreatePage() {
                     Toast.error(res.data.message)
                 } else {
                     console.log("Room Created")
-                    navigate(`/room/${RoomId}`, { state: { RoomId: RoomId, username: username, email: res.data.Email, role: 'owner' } })
+                    console.log('response1=>', res)
+                    navigate(`/room/${RoomId}`, { state: { RoomId, username, email: res.data.Email, role: 'owner' } })
                 }
             })
             .catch(err => {
-                console.error('err=>', err?.response.data)
+                // console.error('err=>', JSON.stringify(err?.response))
+                if (err?.response.data == "Not logged in") { navigate('/login', { state: { path: '/' } }) }
+
                 err?.response.data && Toast.error(err?.response.data)
                 // navigate(`/login`)
             });
@@ -65,14 +69,14 @@ export default function CreatePage() {
         <div className="Wrapper">
             <h1>Code Share</h1>
             <h5>Paste Invitation Info</h5>
-            <form >
+            <form className="homeForm">
                 <input value={RoomId} onChange={e => { setRoomID(e.target.value) }} placeholder='ROOM ID' size='md' />
                 <input value={username} onChange={e => { setUsername(e.target.value) }} placeholder='USERNAME' size='md' />
                 <input type="submit" className="success" onClick={onSubmit} variant='outline' background={'teal'} value="Join" />
             </form>
 
-            <p>Don't have a Room Id? &nbsp;
-                <button onClick={RoomCreate} className="link" colorscheme='teal' variant='link'> Create Room</button>
+            <p>
+                <Link onClick={RoomCreate} className="link underline" colorscheme='teal' variant='link'>Generate</Link>
             </p>
 
         </div>

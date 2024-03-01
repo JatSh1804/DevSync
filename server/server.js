@@ -18,6 +18,9 @@ const { SignUp } = require("./config/Signup");
 const { Login } = require("./config/Login");
 const mongoose = require("mongoose");
 
+// app.use(require('express-status-monitor')(
+//     { port: 3003 ,socketPath:'/statusst'}
+// ));
 
 app.use(
     cors({
@@ -35,7 +38,7 @@ const io = new Server(server, {
         credentials: true
     }
 });
-
+//Middleware used for rectifying request
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }))
 
@@ -62,7 +65,7 @@ app.post('/Room',
 )
 async function GetRoom(req, res) {
     try {
-        const { RoomId, Typeype } = req.body;
+        const { RoomId } = req.body;
         console.log(RoomId)
         // if (Type) {
         authenticate(req.cookies?.token)
@@ -98,6 +101,8 @@ io.use(async (socket, next) => {
         .then((decoded) => {
             socket.decoded = decoded;
             console.log("decode=>", decoded)
+            // Used to pass down decoded info to the event
+            socket.data = { authenticated_email: decoded.Email }
             next()
         })
         .catch(err => {
@@ -108,7 +113,7 @@ io.use(async (socket, next) => {
     // console.log(verification)
 })
 
-mongoose.connect(`mongodb+srv://jatin1804sharma:jatin1234@cluster0.9ynjhkt.mongodb.net/User`)
+mongoose.connect(process.env.MONGODB||'')
     .then(() => { console.log('Connected!') });
 
 const Users = [];
@@ -191,7 +196,6 @@ io.on('connection', (socket) => {
         console.log(Users);
         // console.log(client)
         await RedisPublish(RoomId, "JOIN", { RoomId, username, socket: socket.id, email, role })
-        // await pub.publish(RoomId, JSON.stringify({ type: "JOIN", RoomId, username, socket: socket.id }))
         try {
             const lastCode = await pub.hget(`room:${RoomId}`, 'lastCode')
                 .then(res => JSON.parse(res))
@@ -201,9 +205,26 @@ io.on('connection', (socket) => {
                     socket.emit("Code Sync", { code: res.code, username: res.username });
                     return res;
                 })
-            console.log("lastCode=>", lastCode)
+
         } catch (error) {
             console.log("Last Code doesn't exists.")
+        }
+        try {
+            await pub.hget(`room:${RoomId}`, 'info')
+                .then(res => JSON.parse(res))
+                .then(res => {
+                    console.log('email=>', socket.data.authenticated_email)
+                    console.log(res)
+                    if (socket.data.authenticated_email == res.owner) {
+                        io.to(socket.id).emit('ROLE', { role: 'owner', access: {} });
+                        // socket.to(socket).emit("ROLE", { role: 'owner', access: {} });
+                        console.log("Role Send for the user when Owner joined in \n");
+                    }
+                }
+                )
+        } catch (error) {
+            console.log("ROLE ACCESS ERROR=>", error)
+
         }
     })
 
@@ -227,8 +248,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on("PROMOTE", async ({ RoomId, socketId, role }) => {
-        if (socket.id != socketId) {
-            RedisPublish(RoomId, 'PROMOTED', { role, socketId })
+        if (socket.id != socketId && role == 'owner') {
+            RedisPublish(RoomId, 'PROMOTED', { role:'cohost', socketId })
         }
     })
     socket.on("Compile", async ({ code, language, input, RoomId }) => {
@@ -240,7 +261,7 @@ io.on('connection', (socket) => {
         console.log('language=>', language, code);
         var config = {
             method: 'post',
-            url: process.env.COMPILE_URL || 'https://codex-api.fly.dev',
+            url: process.env.COMPILE_URL || '',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
