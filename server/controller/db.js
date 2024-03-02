@@ -23,6 +23,6 @@ async function SetCred({ Email, Username, Password, id }) {
     if (!user) {
         return await UserAuth.findOneAndUpdate({ Email }, { id, Username, Email, Password }, { new: true, upsert: true });
     }
-    throw new Error("Email Exists Already!")
+    throw new Error("User Exists Already!")
 }
 module.exports = { GetCred, UpdateCred, SetCred };

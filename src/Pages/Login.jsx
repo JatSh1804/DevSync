@@ -15,7 +15,7 @@ function LoginPage() {
         console.log(JSON.stringify(location))
         var config = {
             method: 'POST',
-            url: '/Login',
+            url: 'http://localhost:3002/Login',
             withCredentials: true,
 
             headers: {
@@ -26,7 +26,6 @@ function LoginPage() {
         };
         await axios(config)
             .then(res => {
-                console.log(document.cookie);
                 console.log(JSON.stringify(res.data))
                 setRes(JSON.stringify(res))
                 setTimeout(() => { navigate('/', { state: location.state }) }, 2000)

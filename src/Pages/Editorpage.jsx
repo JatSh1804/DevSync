@@ -26,6 +26,7 @@ import {
     useDisclosure,
     Input,
     Box,
+    Tooltip,
 } from '@chakra-ui/react'
 import { Select } from '@chakra-ui/react'
 
@@ -239,9 +240,12 @@ export default function Editorpage() {
         <div className="wrapdiv">
             <div className="sidebar">
                 <div className="controls">
-                    <AiOutlineInfoCircle className="icons info" />
-                    <HiMiniUserGroup className="icons users" ref={btnRef} onClick={onOpen} />
-
+                    <Tooltip label="Meeting Details" placement="bottom">
+                        <AiOutlineInfoCircle className="icons info"  />
+                    </Tooltip>
+                    <Tooltip label="Members" placement="bottom">
+                        <HiMiniUserGroup className="icons users"   ref={btnRef} onClick={onOpen} />
+                    </Tooltip>
                 </div>
                 <div className="selectDiv">
                     <Select disabled={!access} ref={modeRef} onChange={e => { setmode([e.target.options[e.target.selectedIndex].getAttribute('name'), e.target.value]) }}>

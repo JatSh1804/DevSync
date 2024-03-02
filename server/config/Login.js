@@ -10,7 +10,7 @@ async function Login(req, response) {
     const { Email, Password } = req.body;
     console.log('Email=>', Email, Password)
 
-    const datauser = await GetCred({ Email })
+    await GetCred({ Email })
         .then(async res => {
             console.log(res)
             if (await bcrypt.compare(Password, res.Password)) {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import axios from "axios";
-import { useLocation ,Link} from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
+import Toast, { Toaster } from "react-hot-toast";
 function SignupPage() {
     const location = useLocation();
     const [Username, setUsername] = useState('');
@@ -18,11 +19,17 @@ function SignupPage() {
             data: { Email, Username, Password }
         };
         await axios(config)
-            .then(res => res)
-            .catch(err => console.error(err?.response?.data?.message));
+            .then(res => {
+                console.log(res)
+                Toast.success(res.data.message)
+            })
+            .catch(err => {
+                Toast.error(err?.response?.data?.message)
+                console.error(err?.response?.data?.message)
+            });
 
     }
-    return <>
+    return <><Toaster />
         <form className="homeForm">
             <input placeholder="Username" type="text" value={Username} onChange={e => setUsername(e.target.value)}></input>
             <input placeholder="Email" type="text" value={Email} onChange={e => setEmail(e.target.value)}></input>

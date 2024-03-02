@@ -23,20 +23,19 @@ async function SignUp(req, response) {
 
     // Create the new user
     const user = { id: Date.now(), Username, Email, Password: hashedPassword };
-
-    await SetCred({ id: user.id, Username, Email, Password: hashedPassword })
-        .then(res => {
-            console.log(res);
-            response.status(200).json({ message: 'Profile Created Successfully!' })
-        }
-        )
-        .catch(err => {
-            console.log(err.message);
-            response.status(401).json(err);
-            return;
-        });
-
-
+    try {
+        await SetCred({ id: user.id, Username, Email, Password: hashedPassword })
+            .then(res => {
+                console.log("this is SetCred=>", JSON.stringify(res));
+                response.status(200).json({ message: 'Profile Created Successfully!' })
+            }
+            )
+            .catch(err => {
+                console.log(err.message);
+                response.status(401).json({ message: err.message });
+                return;
+            });
+    } catch (err) { response.status(401).json(err) }
     // Generate a JWT for the new user
     const token = jwt.sign({ id: user.id }, secret_key, { expiresIn: '1h' });
 
