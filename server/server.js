@@ -86,7 +86,7 @@ io.use(async (socket, next) => {
     // console.log(verification)
 })
 
-mongoose.connect(process.env.MONGODB || 'mongodb+srv://jatin1804sharma:jatin1234@cluster0.9ynjhkt.mongodb.net/User' || '')
+mongoose.connect(process.env.MONGODB || '' || '')
     .then(() => { console.log('Connected!') });
 
 const Users = [];
@@ -235,7 +235,7 @@ io.on('connection', (socket) => {
         console.log('language=>', language, code);
         var config = {
             method: 'post',
-            url: process.env.COMPILE_URL || 'https://codex-api.fly.dev' || '',
+            url: process.env.COMPILE_URL || '' || '',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },

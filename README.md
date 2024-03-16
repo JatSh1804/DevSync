@@ -1,12 +1,40 @@
-<<<<<<< HEAD
-# DevSync
-=======
-# React + Vite
+# Real-Time Code Sharing and Chat Application
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is a real-time code sharing and chat application built with Node.js and Socket.IO.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
->>>>>>> 6875334 (Base Update)
+- Real-time code synchronization: Changes made by one user are instantly seen by others in the same room.
+- Real-time chat: Users in the same room can communicate with each other in real-time.
+
+## Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/JatSh1804/DevSync.git
+   ```
+2. Install the dependencies:
+   ```bash
+   npm install
+   ```
+3. To run in Development mode:
+   ```bash
+   npm run start:front
+   ```
+   And
+   ```bash
+   npm run server:dev
+   ```
+   In another terminal session.
+   
+## Usage
+
+Connect to the server at `http://localhost:3002` (or whatever port you have configured). Join a room and start sharing code and chatting in real-time.
+
+## Contributing
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+
+## License
+
+[MIT](https://choosealicense.com/licenses/mit/)
