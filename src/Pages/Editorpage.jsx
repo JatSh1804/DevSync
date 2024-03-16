@@ -30,22 +30,23 @@ import {
 } from '@chakra-ui/react'
 import { Select } from '@chakra-ui/react'
 
-import { AiOutlineArrowDown, AiOutlineEllipsis, AiOutlineInfoCircle, AiOutlineSend } from "react-icons/ai";
-import { HiMiniUserGroup } from "react-icons/hi2";
-
+import { AiOutlineArrowDown, AiOutlineArrowUp, AiOutlineConsoleSql, AiOutlineEllipsis, AiOutlineInfoCircle, AiOutlineSend } from "react-icons/ai";
+import { HiMiniUserGroup, HiPause, HiPlay } from "react-icons/hi2";
+import { FaRegCopy } from "react-icons/fa6";
+import { RxExit } from "react-icons/rx";
 
 export default function Editorpage() {
     const location = useLocation();
     // console.log(location.state)
 
     const navigate = useNavigate();
+
     const editorref = useRef();
     const codeRef = useRef('');
     const socket = useRef();
 
     const [message, setMessage] = useState('');
     const [msgArray, setmsgArray] = useState([]);
-    // console.log(msgArray);
     const { RoomId } = useParams()
     const { queryRoom } = useSearchParams();
     const [lastEdit, setlastEdit] = useState();
@@ -58,6 +59,9 @@ export default function Editorpage() {
     //Handling the Drawer opening for Members.
     const { isOpen, onOpen, onClose } = useDisclosure()
     const btnRef = React.useRef()
+    const msgBox = useRef();
+
+    const [disabled, setDisabled] = useState(false);
 
     const handleRoleAccess = (role) => {
         if (role == 'owner' || role == 'cohost') {
@@ -70,12 +74,9 @@ export default function Editorpage() {
     }
 
     // const socket = io('http://localhost:3002', () => {});
-
-    useEffect(() => { }, [Client])
-
     useEffect(() => {
         const { RoomId, username, email, role } = location.state
-        if (location.state == null) {
+        if (location?.state == null) {
             console.log("emtpy");
             navigate('/', { state: { RoomId: queryRoom } });
             return;
@@ -170,7 +171,8 @@ export default function Editorpage() {
                 socket.current.on("message receive", ({ message, sender, username }) => {
                     console.log("client received", message)
                     // console.log(msgArray);
-                    setmsgArray(prev => { return [...prev, { sender, message, username }] });
+                    const time = new Date()
+                    setmsgArray(prev => { return [...prev, { sender, message, username, time: [time.getHours(), time.getMinutes()] }] });
                     console.log(msgArray);
                 })
                 socket.current.on("PROMOTED", ({ role }) => {
@@ -205,6 +207,10 @@ export default function Editorpage() {
                 break;
         }
     }, [mode])
+    useEffect(() => {
+        console.log("working....")
+        msgBox.current?.scrollIntoView({ behavior: 'smooth' })
+    }, [msgArray])
 
     const sendMsg = (e) => {
         e.preventDefault();
@@ -225,7 +231,9 @@ export default function Editorpage() {
     }
     const compile = async (e) => {
         e.preventDefault();
+        setDisabled(true);
         socket.current.emit("Compile", { code: codeRef.current, RoomId, language: mode[0], input: "" })
+        setTimeout(() => { setDisabled(false); }, 5000)
     }
     const handlePromote = (e) => {
         console.log(e.target)
@@ -238,43 +246,77 @@ export default function Editorpage() {
 
     return <><Toaster position="top-right" />
         <div className="wrapdiv">
-            <div className="sidebar">
+            <Box resize={'both'} minWidth='15vw' width='25vw' minHeight='100vh' overflow='auto' className="sidebar">
                 <div className="controls">
                     <Tooltip label="Meeting Details" placement="bottom">
-                        <AiOutlineInfoCircle className="icons info"  />
+                        <span>
+                            <AiOutlineInfoCircle className="icons info" />
+                        </span>
                     </Tooltip>
                     <Tooltip label="Members" placement="bottom">
-                        <HiMiniUserGroup className="icons users"   ref={btnRef} onClick={onOpen} />
+                        <span>
+                            <HiMiniUserGroup className="icons users" ref={btnRef} onClick={onOpen} />
+                        </span>
                     </Tooltip>
                 </div>
                 <div className="selectDiv">
-                    <Select disabled={!access} ref={modeRef} onChange={e => { setmode([e.target.options[e.target.selectedIndex].getAttribute('name'), e.target.value]) }}>
-                        <option value='javascript' name='js'>javascript</option>``
-                        <option value='clike' name='java'>Java</option>
-                        <option value='clike' name='cpp'>C++</option>
-                        <option value='python' name='py'>Python</option>
-                    </Select>
+                    <Tooltip label={`${!access ? "You Don't have Access!" : "Choose Language!"}`} placement="top">
+                        <Select disabled={!access} ref={modeRef} onChange={e => { setmode([e.target.options[e.target.selectedIndex].getAttribute('name'), e.target.value]) }}>
+                            <option value="javascript" name="js">javascript</option>
+                            <option value="clike" name="java">Java</option>
+                            <option value="clike" name="cpp">C++</option>
+                            <option value="python" name="py">Python</option>
+                        </Select>
+                    </Tooltip>
                 </div>
                 {lastEdit && <p>Last edit by {lastEdit}</p>}
 
                 <div className="Chatbox">
-                    <ul>
-                        {msgArray.map((item, index) => { return <li key={index} name={item.sender}>{item.username}:{item.message}</li> })}
-                    </ul>
+                    <div className="msgBox" ref={msgBox}>
+                        {msgArray.map((item, index) => {
+                            let yourMsg = item.sender == socket.current.id;
+                            let regex = new RegExp(/([\w+]+\:\/\/)?([\w\d-]+\.)*[\w-]+[\.\:]\w+([\/\?\=\&\#\.]?[\w-]+)*\/?/gm)
+                            return <div className={`msgDiv ${yourMsg && 'yourMsgDiv'}`} key={index} name={item.sender}>
+                                <div className="">
+                                    <div className={`flex sender ${yourMsg && 'otherText'}`}>
+                                        <span className={`${yourMsg ? 'you' : 'other'}`}>
+                                            {yourMsg ? 'You' : item.username}
+                                        </span>
+                                        <span className="texttime">{`${item.time[0]}:${item.time[1]}`}</span>
+                                    </div>
+                                    {item.message.match(regex) ?
+                                        <a href={item.message.startsWith('http://') || item.message.startsWith('https://') ? item.message : `http://${item.message}`} target='_blank' className={`msgText ${yourMsg && 'otherText'} linkmsg`}>{item.message}</a>
+                                        : <div className={`msgText ${yourMsg && 'otherText'}`}> {item.message}</div>
+                                    }                                </div>
+                            </div>
+                        })}
+                    </div>
+
                     <form className="chat">
                         <div className="textbox flex">
                             <input type="text" className="message" onChange={e => { setMessage(e.target.value) }} placeholder="Type Message..." value={message}></input>
-                            <label htmlFor="send" className="sendicon"><AiOutlineSend size={'30px'} fontSize={'1000'} /></label>
+                            <Tooltip placement="top" label="Message Send" >
+                                <label htmlFor="send" className="sendicon"><AiOutlineSend size={'30px'} fontSize={'1000'} /></label>
+                            </Tooltip>
                             <input type="submit" id="send" className="send" onClick={sendMsg} value={"send"}></input>
                         </div>
                     </form>
                 </div>
-                <div style={{ display: 'grid', gap: '10px', marginBottom: 10 }}>
-                    <input type="button" className="success" onClick={compile} disabled={!access} value="Run" />
-                    <input style={{}} type="button" className="success" onClick={copyclipboard} value={'Copy Room Id'}></input>
-                    <input style={{}} type="button" className="error" onClick={leaveroom} value={'Leave Room'}></input>
+                <div className="controls" style={{ gap: '10px', marginBottom: 10 }}>
+                    <Tooltip placement="top" label={`${!access ? "You don't have Access to Run!" : 'Run!'}`}>
+                        <label htmlFor="run" className={`success prevent ${(!access || disabled) && 'disabled'}`}><HiPlay /></label>
+                    </Tooltip>
+                    <Tooltip placement="top" label="Copy Room Code">
+                        <label htmlFor="copy" className="success"><FaRegCopy /></label>
+                    </Tooltip>
+                    <Tooltip placement="top" label="Leave Room">
+                        <label htmlFor="leave" className="error"><RxExit /></label>
+                    </Tooltip>
+                    <input id='run' type="button" className={`success prevent ${(!access || disabled) && 'disabled'}`} onClick={compile} disabled={!access || disabled} value={'RUN'} />
+                    <input id='copy' type="button" className="success" onClick={copyclipboard} value={'Copy Room Id'}></input>
+                    <input id='leave' type="button" className="error" onClick={leaveroom} value={'Leave Room'}></input>
                 </div>
-            </div>
+            </Box>
             <div className="realtimeeditor">
                 <textarea disabled={access} id="codeeditor"></textarea>
             </div>
@@ -304,7 +346,7 @@ export default function Editorpage() {
                                         fontWeight={400}
                                     ><AiOutlineEllipsis /></MenuButton>
                                     <MenuList background={''}>
-                                        <MenuItem onClick={(role == 'owner' && access) && handlePromote} background={'transparent'} name={item.socketId} color={'rgb(99,198,99)'} backdropBlur={'10px'} icon={<AiOutlineArrowDown />} command='⌘T'>
+                                        <MenuItem onClick={(role == 'owner' && access) && handlePromote} background={'transparent'} name={item.socketId} color={'rgb(99,198,99)'} backdropBlur={'10px'} icon={<AiOutlineArrowUp />} command='⌘T'>
                                             Promo to Co-Host
                                         </MenuItem>
                                         <MenuItem background={'transparent'} backdropBlur={'10px'} icon={<AiOutlineArrowDown />} command='⌘T'>

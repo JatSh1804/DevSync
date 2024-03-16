@@ -17,6 +17,7 @@ const cookie = require("cookie")
 const { SignUp } = require("./config/Signup");
 const { Login } = require("./config/Login");
 const mongoose = require("mongoose");
+const { GetRoom } = require("./controller/GetRoom");
 
 // app.use(require('express-status-monitor')(
 //     { port: 3003 ,socketPath:'/statusst'}
@@ -63,35 +64,7 @@ app.post('/user', (req, res) => {
 app.post('/Room',
     (req, res) => GetRoom(req, res)
 )
-async function GetRoom(req, res) {
-    try {
-        const { RoomId } = req.body;
-        console.log(RoomId)
-        // if (Type) {
-        authenticate(req.cookies?.token)
-            .then(async decoded => {
-                await pub.exists(`room:${RoomId}`)
-                    .then(response => {
-                        console.log('RoomDetails=>', response)
-                        if (response) {
-                            res.status(200).json({ Exists: true, message: 'Room Exists!' })
-                        }
-                        else {
-                            res.status(200).json({ Exists: false, ...decoded, message: 'Room Does not Exists!' })
-                        }
-                    })
-            })
-            .catch((err) => {
-                console.log(err)
-                res.status(401).send('Not logged in')
-            })
-        // }
-    }
-    catch (error) {
-        res.send(new Error(error))
-        throw Error(error)
-    }
-}
+
 
 io.use(async (socket, next) => {
     // const cookies = c ie.parse(socket.request.headers.cookie || '');
@@ -113,7 +86,7 @@ io.use(async (socket, next) => {
     // console.log(verification)
 })
 
-mongoose.connect(process.env.MONGODB||'')
+mongoose.connect(process.env.MONGODB || 'mongodb+srv://jatin1804sharma:jatin1234@cluster0.9ynjhkt.mongodb.net/User' || '')
     .then(() => { console.log('Connected!') });
 
 const Users = [];
@@ -212,11 +185,12 @@ io.on('connection', (socket) => {
         try {
             await pub.hget(`room:${RoomId}`, 'info')
                 .then(res => JSON.parse(res))
-                .then(res => {
+                .then(async res => {
                     console.log('email=>', socket.data.authenticated_email)
                     console.log(res)
                     if (socket.data.authenticated_email == res.owner) {
                         io.to(socket.id).emit('ROLE', { role: 'owner', access: {} });
+                        await pub.hset(`room:${RoomId}`, 'socket', socket.id)
                         // socket.to(socket).emit("ROLE", { role: 'owner', access: {} });
                         console.log("Role Send for the user when Owner joined in \n");
                     }
@@ -249,7 +223,7 @@ io.on('connection', (socket) => {
 
     socket.on("PROMOTE", async ({ RoomId, socketId, role }) => {
         if (socket.id != socketId && role == 'owner') {
-            RedisPublish(RoomId, 'PROMOTED', { role:'cohost', socketId })
+            RedisPublish(RoomId, 'PROMOTED', { role: 'cohost', socketId })
         }
     })
     socket.on("Compile", async ({ code, language, input, RoomId }) => {
@@ -261,7 +235,7 @@ io.on('connection', (socket) => {
         console.log('language=>', language, code);
         var config = {
             method: 'post',
-            url: process.env.COMPILE_URL || '',
+            url: process.env.COMPILE_URL || 'https://codex-api.fly.dev' || '',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
@@ -270,12 +244,12 @@ io.on('connection', (socket) => {
 
         await axios(config)
             .then(async (response) => {
-                // console.log('response=>', response.)
                 await RedisPublish(RoomId, 'COMPILE', { result: response.data })
                 console.log('response=>', (response));
             })
-            .catch(function (error) {
+            .catch(async (error) => {
                 console.log('err =>', error);
+                await RedisPublish(RoomId, 'COMPILE', { result: error.data })
             });
     })
 

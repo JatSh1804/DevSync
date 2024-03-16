@@ -1,3 +1,6 @@
+/* $primary-colour:'RGB(1, 172, 192)'
+$secondary-colour:RGB(33, 36, 41)*/
+
 * {
   margin: 0;
   padding: 0;
@@ -129,6 +132,7 @@ button {
 
 .success {
   background: rgb(99, 198, 99);
+  transition: transform 0.2s ease;
 }
 
 .success:hover {
@@ -136,7 +140,12 @@ button {
 }
 
 .success:active {
+  transform: scale(0.986);
   opacity: 0.75;
+}
+
+.prevent.success:disabled.success:disabled {
+  cursor: not-allowed;
 }
 
 .error {
@@ -215,4 +224,8 @@ body a {
   to {
     background-position: 20vw;
   }
+}
+
+.disabled {
+  background-color: grey !important;
 }

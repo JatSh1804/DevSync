@@ -17,20 +17,20 @@ export default function Homepage() {
   const [RoomId, setRoomID] = useState(queryRoom.get('room') || location?.state?.RoomId || '');
   const [username, setUsername] = useState(location?.state?.username || '');
 
+  const [disabled, setDisabled] = useState(false);
   React.useEffect(() => {
     navigate(location.pathname, { replace: true })
-  },[])
+  }, [])
   const onSubmit = async e => {
     e.preventDefault();
-    if (!username) {
-      Toast.error(`Enter User Name`); return;
-    };
+    if (!username) { Toast.error(`Enter User Name`); return; };
     if (!RoomId) { Toast.error('Enter Room Id'); return; }
+    setDisabled(true)
     console.log(RoomId);
     console.log(username);
     var config = {
       method: 'POST',
-      url: '/Room',
+      url: 'http://localhost:3002/Room',
       withCredentials: true,
       data: { RoomId },
       headers: {
@@ -42,17 +42,24 @@ export default function Homepage() {
         // console.log(res);
         if (res.data.Exists) {
           navigate(`/room/${RoomId}`, { state: { RoomId, username, role: 'member' } })
-        } else { Toast.error(res.data.message) }
+        } else {
+          Toast.error(res.data.message)
+        }
       })
       .catch(error => {
         console.log(error)
-        const res = error.response?.data || error.message
+        const res = error.response?.data?.message || error.response?.data || error.message
         if (res == 'Not logged in') {
-          navigate("/Login", { state: { path: '/', RoomId, username } })
+          Toast.error("You Need to Log In First!")
+          setTimeout(() => {
+            navigate("/Login", { state: { path: '/', RoomId, username } })
+          }, 2500)
         }
         else {
           Toast.error(`${res}`)
         }
+      }).finally(() => {
+        setTimeout(() => { setDisabled(false) }, 1500)
       })
   };
 
@@ -190,7 +197,7 @@ export default function Homepage() {
           <form className="homeForm">
             <input value={RoomId} onChange={e => { setRoomID(e.target.value) }} placeholder='Enter Room Code' size='md' />
             <input value={username} onChange={e => { setUsername(e.target.value) }} placeholder='USERNAME' size='md' />
-            <input type="submit" className="success" onClick={onSubmit} variant='outline' background={'teal'} value="Join" />
+            <input type="submit" disabled={disabled} className={`${disabled && 'disabled'} prevent success`} onClick={onSubmit} variant='outline' background={'teal'} value="Join" />
           </form>
         </div>
         <div className="buttonDiv">

@@ -13,6 +13,9 @@ export default function CreatePage() {
     const [RoomId, setRoomID] = useState(queryRoom.get('room') || location?.state?.RoomId || '');
     const [username, setUsername] = useState('');
 
+    const [disabled, setDisabled] = useState(false);
+
+
 
     const onSubmit = async e => {
         e.preventDefault();
@@ -21,10 +24,11 @@ export default function CreatePage() {
         };
         if (!RoomId) { Toast.error('Enter Room Id'); return; }
         console.log(RoomId);
+        setDisabled(true)
         // console.log(username);
         var config = {
             method: 'POST',
-            url: '/Room',
+            url: 'http://localhost:3002/Room',
             withCredentials: true,
             data: { RoomId },
             headers: {
@@ -44,10 +48,12 @@ export default function CreatePage() {
             })
             .catch(err => {
                 // console.error('err=>', JSON.stringify(err?.response))
-                if (err?.response.data == "Not logged in") { navigate('/login', { state: { path: '/' } }) }
+                if (err?.response?.data == "Not logged in") { navigate('/login', { state: { path: '/' } }) }
 
-                err?.response.data && Toast.error(err?.response.data)
+                err?.response?.data && Toast.error(err?.response.data)
                 // navigate(`/login`)
+            }).finally(() => {
+                setTimeout(() => { setDisabled(false) },1500)
             });
 
     };
@@ -72,7 +78,7 @@ export default function CreatePage() {
             <form className="homeForm">
                 <input value={RoomId} onChange={e => { setRoomID(e.target.value) }} placeholder='ROOM ID' size='md' />
                 <input value={username} onChange={e => { setUsername(e.target.value) }} placeholder='USERNAME' size='md' />
-                <input type="submit" className="success" onClick={onSubmit} variant='outline' background={'teal'} value="Join" />
+                <input type="submit" disabled={disabled} className="success" onClick={onSubmit} variant='outline' background={'teal'} value="Join" />
             </form>
 
             <p>
