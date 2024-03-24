@@ -30,7 +30,7 @@ export default function Homepage() {
     console.log(username);
     var config = {
       method: 'POST',
-      url: '/Room',
+      url: 'http://localhost:3002/Room',
       withCredentials: true,
       data: { RoomId },
       headers: {

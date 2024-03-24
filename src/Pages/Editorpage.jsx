@@ -26,14 +26,16 @@ import {
     useDisclosure,
     Input,
     Box,
-    Tooltip,
 } from '@chakra-ui/react'
 import { Select } from '@chakra-ui/react'
-
-import { AiOutlineArrowDown, AiOutlineArrowUp, AiOutlineConsoleSql, AiOutlineEllipsis, AiOutlineInfoCircle, AiOutlineSend } from "react-icons/ai";
+// import  from "@tippyjs/react";
+// import 'tippy.js/dist/tippy.css';
+import { AiOutlineArrowDown, AiOutlineArrowUp, AiOutlineEllipsis, AiOutlineInfoCircle, AiOutlinePlus, AiOutlineSend } from "react-icons/ai";
 import { HiMiniUserGroup, HiPause, HiPlay } from "react-icons/hi2";
 import { FaRegCopy } from "react-icons/fa6";
 import { RxExit } from "react-icons/rx";
+import { ManualClose } from "../components/ui/ManualModal";
+import { Manualtippy } from "../components/ui/ManualTippy";
 
 export default function Editorpage() {
     const location = useLocation();
@@ -52,15 +54,17 @@ export default function Editorpage() {
     const [lastEdit, setlastEdit] = useState();
 
     const [Client, setClients] = useState([])
+    const [ClientEmails, setEmails] = useState({});
     const [mode, setmode] = useState(['js', 'javascript'])
     const [role, setRole] = useState();
     const [access, setAccess] = useState();
     const modeRef = useRef();
     //Handling the Drawer opening for Members.
-    const { isOpen, onOpen, onClose } = useDisclosure()
+    const { isOpen, onOpen, onClose } = useDisclosure();
     const btnRef = React.useRef()
     const msgBox = useRef();
 
+    const [ModalValue, setModalValue] = useState({ active: false });
     const [disabled, setDisabled] = useState(false);
 
     const handleRoleAccess = (role) => {
@@ -72,10 +76,10 @@ export default function Editorpage() {
             editorref.current.setOption('readOnly', 'nocursor')
         }
     }
-
     // const socket = io('http://localhost:3002', () => {});
     useEffect(() => {
-        const { RoomId, username, email, role } = location.state
+        const { username, email, role } = location.state
+        const RoomId = location?.state?.RoomId || queryRoom
         if (location?.state == null) {
             console.log("emtpy");
             navigate('/', { state: { RoomId: queryRoom } });
@@ -103,8 +107,8 @@ export default function Editorpage() {
         const connect = async () => {
 
             init();
-            socket.current = await socketinit();
-            socket.current.on('connect_error', (err) => Toast.error(err.message));
+            socket.current = await socketinit({ RoomId });
+            socket.current.on('connect_error', (err) => Toast.error(`Hello ${err.message}`));
             socket.current.on('connect_failed', (err) => Toast.error("Not Able to connect right now!"));
             console.log("Socket current=>", socket.current)
             let changeTimer;
@@ -128,10 +132,18 @@ export default function Editorpage() {
                 socket.current.emit('UserJoin', { RoomId, username, email, role })
                 // console.log(socket.id)
 
-                socket.current.on("Joined", ({ client, socketId, username, role }) => {
-                    console.log(role)
+                socket.current.on("Joined", ({ client, socketId, username, role, email }) => {
+                    console.log(client)
                     setClients(client);
-                    // console.log(Client);
+                    setEmails(prevEmails => ({
+                        ...prevEmails,
+                        ...client.reduce((acc, { socketId, email }) => {
+                            acc[socketId] = email;
+                            return acc;
+                        }, {}),
+                        [socketId]: email
+                    }));
+
                     (socket.current?.id == socketId) ? (() => {
                         Toast.success("You joined a Room!");
 
@@ -181,6 +193,19 @@ export default function Editorpage() {
                     setRole(role)
                         (role == 'cohost' && Toast.success(`Promoted to Co-Host!`));
                 })
+                socket.current.on("Kicked", ({ email, socketId }) => {
+                    if (socket.current?.id == socketId) {
+                        Toast.error('You have been Kicked Out!')
+                        socket.current?.disconnect();
+                        setModalValue({
+                            Header: 'You have been kicked out from the Room',
+                            Message: 'You can Join the Room after 1 Hour. ',
+                            error: 'Leave Room!',
+                            timeout: 15000,
+                            active: true
+                        })
+                    }
+                })
             })
             socket.current.on("connection_failed", () => { Toast.error("No Connection established!") })
 
@@ -189,7 +214,7 @@ export default function Editorpage() {
         connect();
 
 
-        console.log('role=>', email)
+        console.log('role=>', role)
 
         return () => { socket.current.disconnect(); socket.current.off("Joined") }
     }, []);
@@ -227,7 +252,7 @@ export default function Editorpage() {
     }
     const copyclipboard = async () => {
         Toast.success("Room ID copied!")
-        await navigator.clipboard.writeText(RoomId, socket.socket.current.id)
+        await navigator.clipboard.writeText(RoomId)
     }
     const compile = async (e) => {
         e.preventDefault();
@@ -241,33 +266,55 @@ export default function Editorpage() {
             socket.current.emit('PROMOTE', { RoomId, socketId: e.target.getAttribute('name'), role })
         }
     }
+    const handleKick = (e) => {
+        let socketId = e.target.getAttribute('name');
+        let username = e.target
+        console.log(username)
+        console.log(socketId)
+        if (ClientEmails && ClientEmails[socketId]) {
+            console.log("rece")
+            setModalValue({
+                Header: `You want to kick ${username} from the room?`,
+                Message: `${username} will not be able to join again for 1 hour.`,
+                error: 'Cancel',
+                success: 'Kick',
+                active: true,
+                successFunction: () => socket.current.emit('Kick', { RoomId, socketId, role, email: ClientEmails[socketId] }),
+                errorFunction: () => { }
+            })
+        }
+    }
+    const handleFileShare = (e) => {
+        console.log(e.target.value);
+    }
     // console.log(location.state)
     // console.log(mode)
 
     return <><Toaster position="top-right" />
+        <ManualClose value={ModalValue} />
         <div className="wrapdiv">
             <Box resize={'both'} minWidth='15vw' width='25vw' minHeight='100vh' overflow='auto' className="sidebar">
                 <div className="controls">
-                    <Tooltip label="Meeting Details" placement="bottom">
+                    <Manualtippy content="Meeting Details" placement="bottom" animation='text' theme='forest' delay={[500, 100]} >
                         <span>
                             <AiOutlineInfoCircle className="icons info" />
                         </span>
-                    </Tooltip>
-                    <Tooltip label="Members" placement="bottom">
+                    </Manualtippy>
+                    <Manualtippy content="Members" placement="bottom">
                         <span>
                             <HiMiniUserGroup className="icons users" ref={btnRef} onClick={onOpen} />
                         </span>
-                    </Tooltip>
+                    </Manualtippy>
                 </div>
                 <div className="selectDiv">
-                    <Tooltip label={`${!access ? "You Don't have Access!" : "Choose Language!"}`} placement="top">
+                    <Manualtippy content={`${!access ? "You Don't have Access!" : "Choose Language!"}`} placement="top">
                         <Select disabled={!access} ref={modeRef} onChange={e => { setmode([e.target.options[e.target.selectedIndex].getAttribute('name'), e.target.value]) }}>
                             <option value="javascript" name="js">javascript</option>
                             <option value="clike" name="java">Java</option>
                             <option value="clike" name="cpp">C++</option>
                             <option value="python" name="py">Python</option>
                         </Select>
-                    </Tooltip>
+                    </Manualtippy>
                 </div>
                 {lastEdit && <p>Last edit by {lastEdit}</p>}
 
@@ -295,23 +342,28 @@ export default function Editorpage() {
                     <form className="chat">
                         <div className="textbox flex">
                             <input type="text" className="message" onChange={e => { setMessage(e.target.value) }} placeholder="Type Message..." value={message}></input>
-                            <Tooltip placement="top" label="Message Send" >
+                            <Manualtippy placement="top" content="Message Send" >
                                 <label htmlFor="send" className="sendicon"><AiOutlineSend size={'30px'} fontSize={'1000'} /></label>
-                            </Tooltip>
+                            </Manualtippy>
                             <input type="submit" id="send" className="send" onClick={sendMsg} value={"send"}></input>
+
+                            <Manualtippy placement='top' content='Share File'>
+                                <label htmlFor="file" className="sendicon" onClick={handleFileShare}><AiOutlinePlus size={'30px'} fontSize={'100'} /></label>
+                            </Manualtippy>
+                            <input type="file" className="file send" id="file" ></input>
                         </div>
                     </form>
                 </div>
                 <div className="controls" style={{ gap: '10px', marginBottom: 10 }}>
-                    <Tooltip placement="top" label={`${!access ? "You don't have Access to Run!" : 'Run!'}`}>
-                        <label htmlFor="run" className={`success prevent ${(!access || disabled) && 'disabled'}`}><HiPlay /></label>
-                    </Tooltip>
-                    <Tooltip placement="top" label="Copy Room Code">
-                        <label htmlFor="copy" className="success"><FaRegCopy /></label>
-                    </Tooltip>
-                    <Tooltip placement="top" label="Leave Room">
+                    <Manualtippy placement="top" content="Leave Room">
                         <label htmlFor="leave" className="error"><RxExit /></label>
-                    </Tooltip>
+                    </Manualtippy>
+                    <Manualtippy placement="top" content="Copy Room Code">
+                        <label htmlFor="copy" className="success"><FaRegCopy /></label>
+                    </Manualtippy>
+                    <Manualtippy placement="top" content={`${!access ? "You don't have Access to Run!" : disabled ? 'Compiling!' : 'Run!'}`}>
+                        <label htmlFor="run" className={`success prevent ${(!access || disabled) && 'disabled'}`}>{disabled ? <HiPause fontWeight={700} /> : <HiPlay />}</label>
+                    </Manualtippy>
                     <input id='run' type="button" className={`success prevent ${(!access || disabled) && 'disabled'}`} onClick={compile} disabled={!access || disabled} value={'RUN'} />
                     <input id='copy' type="button" className="success" onClick={copyclipboard} value={'Copy Room Id'}></input>
                     <input id='leave' type="button" className="error" onClick={leaveroom} value={'Leave Room'}></input>
@@ -328,10 +380,9 @@ export default function Editorpage() {
             finalFocusRef={btnRef}
         >
             <DrawerOverlay />
-            <DrawerContent background={'rgb(3 7 18)'}>
+            <DrawerContent background='rgb(3 7 18)'>
                 <DrawerCloseButton />
                 <DrawerHeader>People in Room</DrawerHeader>
-
                 <DrawerBody>
                     <Input placeholder='Search People...' marginBottom={'20px'} />
                     <Box height={'60%'} border={'1px solid grey'} borderRadius={'10px'}>
@@ -339,22 +390,22 @@ export default function Editorpage() {
                             {Client.map(item => <div className="userinfo" name={item.socketId}>{item.username}
                                 <Menu>
                                     <MenuButton
-                                        aria-label='Options'
+                                        aria-content='Options'
                                         variant='outline'
                                         p={0}
                                         fontSize={'30px'}
                                         fontWeight={400}
                                     ><AiOutlineEllipsis /></MenuButton>
                                     <MenuList background={''}>
-                                        <MenuItem onClick={(role == 'owner' && access) && handlePromote} background={'transparent'} name={item.socketId} color={'rgb(99,198,99)'} backdropBlur={'10px'} icon={<AiOutlineArrowUp />} command='⌘T'>
-                                            Promo to Co-Host
+                                        <MenuItem onClick={(role == 'owner' && access) && handlePromote} isDisabled={!(role == 'owner' && access)} background={'transparent'} name={item.socketId} color={'rgb(99,198,99)'} backdropBlur={'10px'} icon={<AiOutlineArrowUp />} command='⌘T'>
+                                            Promote to Co-Host
                                         </MenuItem>
-                                        <MenuItem background={'transparent'} backdropBlur={'10px'} icon={<AiOutlineArrowDown />} command='⌘T'>
+                                        <MenuItem onClick={(role == 'owner' && access) && handleKick} isDisabled={!(role == 'owner' && access)} background={'transparent'} name={item.socketId} backdropBlur={'10px'} icon={<AiOutlineArrowDown />} command='⌘T'>
+                                            Kick Out from Room!
+                                        </MenuItem>
+                                        {/* <MenuItem background={'transparent'} backdropBlur={'10px'} icon={<AiOutlineArrowDown />} command='⌘T'>
                                             New Tab
-                                        </MenuItem>
-                                        <MenuItem background={'transparent'} backdropBlur={'10px'} icon={<AiOutlineArrowDown />} command='⌘T'>
-                                            New Tab
-                                        </MenuItem>
+                                        </MenuItem> */}
                                     </MenuList>
                                 </Menu>
                             </div>)}

@@ -22,7 +22,7 @@ function LoginPage() {
         console.log(JSON.stringify(location))
         var config = {
             method: 'POST',
-            url: '/Login',
+            url: 'http://localhost:3002/Login',
             withCredentials: true,
 
             headers: {

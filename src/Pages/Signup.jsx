@@ -12,7 +12,7 @@ function SignupPage() {
         e.preventDefault();
         var config = {
             method: 'post',
-            url: '/Signup',
+            url: 'http://localhost:3002/Signup',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },

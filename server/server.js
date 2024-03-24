@@ -19,6 +19,9 @@ const { Login } = require("./config/Login");
 const mongoose = require("mongoose");
 const { GetRoom } = require("./controller/GetRoom");
 
+const Room = require("./Schema/room");
+const { checkKickedUser } = require("./middleware/checkKicked");
+
 // app.use(require('express-status-monitor')(
 //     { port: 3003 ,socketPath:'/statusst'}
 // ));
@@ -65,28 +68,7 @@ app.post('/Room',
     (req, res) => GetRoom(req, res)
 )
 
-
-io.use(async (socket, next) => {
-    // const cookies = c ie.parse(socket.request.headers.cookie || '');
-    // const token = cookies.token;
-    const token = cookie.parse(socket.handshake.headers.cookie || '').token
-    authenticate(token)
-        .then((decoded) => {
-            socket.decoded = decoded;
-            console.log("decode=>", decoded)
-            // Used to pass down decoded info to the event
-            socket.data = { authenticated_email: decoded.Email }
-            next()
-        })
-        .catch(err => {
-            console.log('error=>', err),
-                next(new Error(err))
-            // next()
-        })
-    // console.log(verification)
-})
-
-mongoose.connect(process.env.MONGODB || '' || '')
+mongoose.connect(process.env.MONGODB || 'mongodb+srv://jatin1804sharma:jatin1234@cluster0.9ynjhkt.mongodb.net/User' || '')
     .then(() => { console.log('Connected!') });
 
 const Users = [];
@@ -95,20 +77,20 @@ async function AllConnectedUser(RoomId) {
     let Alluser = await pub.hgetall(`room:${RoomId}:users`)
         .then(res =>
             Object.entries(res).map(([socketId, value]) => {
-                let [username, role] = value.split('/');
-                return { socketId, username, role }
+                let [username, role, email] = value.split('/');
+                return { socketId, username, role, email }
             })
         )
     return Alluser;
 };
 const CodeExpire = async (socket, timeout) => {
     console.log('expire');
-    await pub.expire(`room:${Users[socket.id].RoomId}`, timeout)
+    await pub.expire(`room:${Users[socket.id]?.RoomId}`, timeout)
         .then(res => console.log('expire=>', res))
 }
 
 const RedisPublish = async (RoomId, type, data) => {
-    // console.log(type)
+    // console.log(JSON.stringify(data))
     await pub.publish(RoomId, JSON.stringify({ type, ...data }))
 }
 
@@ -123,7 +105,7 @@ sub.on("message", async (channel, message) => {
             try {
                 AllConnectedUser(data.RoomId)
                     .then(async res => {
-                        // console.log('allConnectedUser=>',)
+                        console.log('allConnectedUser=>',)
                         io.in(channel).emit("Joined", { client: res, socketId: data.socket, username: data.username, role: data.role, email: data.email });
                     })
             } catch (error) {
@@ -149,10 +131,36 @@ sub.on("message", async (channel, message) => {
             break;
         case 'PROMOTED':
             io.to(data.socketId).emit('PROMOTED', { role: data.role });
+            break;
+        case 'Kicked':
+            io.in(channel).emit("Kicked", { email: data.email, socketId: data.socketId })
+            break;
         default:
             break;
+
     }
 })
+io.use(async (socket, next) => {
+    // const cookies = c ie.parse(socket.request.headers.cookie || '');
+    // const token = cookies.token;
+    const token = cookie.parse(socket.handshake.headers.cookie || '').token
+    authenticate(token)
+        .then((decoded) => {
+            socket.decoded = decoded;
+            console.log("decode=>", decoded)
+            // Used to pass down decoded info to the event
+            socket.data = { authenticated_email: decoded.Email }
+            next()
+        })
+        .catch(err => {
+            console.log('error=>', err.message),
+                next(new Error(err))
+            // next()
+        })
+    // console.log(verification)
+})
+io.use((socket, next) => checkKickedUser(socket, next))
+
 io.on('connection', (socket) => {
     socket.on("UserJoin", async ({ RoomId, username, email, role }) => {
         console.log('USERJOINED')
@@ -163,12 +171,12 @@ io.on('connection', (socket) => {
         sub.subscribe(RoomId);
         Users[socket.id] = { username, RoomId };
         socket.join(RoomId);
-        await pub.hset(`room:${RoomId}:users`, socket.id, `${username}/${role}`)
+        await pub.hset(`room:${RoomId}:users`, socket.id, `${username}/${role}/${socket.data.authenticated_email}`)
 
         console.log({ RoomId, username, socketid: socket.id })
         console.log(Users);
         // console.log(client)
-        await RedisPublish(RoomId, "JOIN", { RoomId, username, socket: socket.id, email, role })
+        await RedisPublish(RoomId, "JOIN", { RoomId, username, socket: socket.id, email: socket.data.authenticated_email, role })
         try {
             const lastCode = await pub.hget(`room:${RoomId}`, 'lastCode')
                 .then(res => JSON.parse(res))
@@ -178,6 +186,13 @@ io.on('connection', (socket) => {
                     socket.emit("Code Sync", { code: res.code, username: res.username });
                     return res;
                 })
+            // const room = await Room.findOne({ RoomId });
+            // room.createdAt = undefined;
+
+            // Save the updated room document
+            await room.save();
+
+            console.log(`Expiration time removed for room ${RoomId} when user ${username} joined`)
 
         } catch (error) {
             console.log("Last Code doesn't exists.")
@@ -235,7 +250,7 @@ io.on('connection', (socket) => {
         console.log('language=>', language, code);
         var config = {
             method: 'post',
-            url: process.env.COMPILE_URL || '' || '',
+            url: process.env.COMPILE_URL || 'http://localhost:3000' || 'api.codex.jagraav.in' || '',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
@@ -253,18 +268,48 @@ io.on('connection', (socket) => {
             });
     })
 
-    socket.on('disconnect', async (Room, reason) => {
+    socket.on("Kick", async ({ RoomId, socketId, role, email }) => {
+        // Check permissions and perform kick action as before...
+
+        // Update the room document in the database to reflect the kicked user
+        try {
+            // const objectRoomId = new mongoose.Types.ObjectId(RoomId);
+            const room = Room.findOneAndUpdate(
+                { RoomId },
+                { $push: { kickedUsers: { email } } },
+                { new: true, upsert: true } // To return the updated document
+            ).then(updatedRoom => {
+                console.log('Room updated successfully with kicked user:', updatedRoom);
+            })
+                .catch(err => {
+                    console.error('Failed to update room:', err);
+                });
+
+            // console.log('RoomInfo:=>', room)
+            // Add the kicked user's information to the kickedUsers array
+            RedisPublish(RoomId, 'Kicked', { socketId, email })
+
+            // Notify other users in the room about the kick (if needed)
+
+            console.log(`User ${socketId} has been kicked out from room ${RoomId} and updated in the database`);
+        } catch (error) {
+            console.error(`Failed to update room ${RoomId} in the database:`, error);
+        }
+    });
+
+    socket.on('disconnect', async (reason) => {
         const User = Users[socket.id];
         // console.log('room>', Users?.RoomId);
         try {
             await RedisPublish(User?.RoomId, 'LEAVE', { socketId: socket.id, User: User })
-            await pub.hdel(`room:${User.RoomId}:users`, socket.id)
+            await pub.hdel(`room:${User?.RoomId}:users`, socket.id)
             // console.log("AllUser=>", await AllConnectedUser(User.RoomId).length)
-            await AllConnectedUser(User.RoomId)
+            await AllConnectedUser(User?.RoomId)
                 .then(data => {
                     if (data.length == 0) {
                         console.log('expire1')
                         CodeExpire(socket, 300)
+                        // Room.index({ createdAt: 1 }, { expireAfterSeconds: 300 });
                     }
                 })
             delete Users[socket.id]

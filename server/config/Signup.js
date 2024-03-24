@@ -1,7 +1,6 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const secret_key = process.env.SECRET_KEY || 'devSync';
-const UserAUTH = require("../Schema/User");
 const { SetCred } = require('../controller/db');
 
 
