@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import fs from 'fs'
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Codemirror from "codemirror";
 import "codemirror/lib/codemirror.css"
@@ -36,6 +37,7 @@ import { FaRegCopy } from "react-icons/fa6";
 import { RxExit } from "react-icons/rx";
 import { ManualClose } from "../components/ui/ManualModal";
 import { Manualtippy } from "../components/ui/ManualTippy";
+import createDevice from "../components/DeviceConfig";
 
 export default function Editorpage() {
     const location = useLocation();
@@ -67,6 +69,12 @@ export default function Editorpage() {
     const [ModalValue, setModalValue] = useState({ active: false });
     const [disabled, setDisabled] = useState(false);
 
+
+    const [rtpCapability, setRtpCapability] = useState();
+    const [device, setDevice] = useState();
+    const producer = useRef();
+
+
     const handleRoleAccess = (role) => {
         if (role == 'owner' || role == 'cohost') {
             setAccess(true);
@@ -76,15 +84,15 @@ export default function Editorpage() {
             editorref.current.setOption('readOnly', 'nocursor')
         }
     }
-    // const socket = io('http://localhost:3002', () => {});
+    // const socket = io('http://', () => {});
     useEffect(() => {
-        const { username, email, role } = location.state
-        const RoomId = location?.state?.RoomId || queryRoom
         if (location?.state == null) {
             console.log("emtpy");
             navigate('/', { state: { RoomId: queryRoom } });
             return;
         }
+        const { username, email, role } = location.state
+        const RoomId = location?.state?.RoomId || queryRoom
         async function init() {
             editorref.current = Codemirror.fromTextArea(document.getElementById("codeeditor"), {
                 mode: {
@@ -129,7 +137,11 @@ export default function Editorpage() {
 
             socket.current.on("connect", () => {
                 console.log("Connected to the Server!")
-                socket.current.emit('UserJoin', { RoomId, username, email, role })
+                socket.current.emit('UserJoin', { RoomId, username, email, role }, (rtpCapability) => {
+                    // console.log('rtpCapability=>',JSON.stringify(rtpCapability))
+                    setRtpCapability(rtpCapability);
+                    createDevice(rtpCapability);
+                })
                 // console.log(socket.id)
 
                 socket.current.on("Joined", ({ client, socketId, username, role, email }) => {
@@ -224,10 +236,10 @@ export default function Editorpage() {
         console.log("ModeChange", mode[0])
         switch (mode[0]) {
             case 'js':
-                editorref.current.setValue("let text = `Hello World!`; \n console.log(text)")
+                editorref?.current.setValue("let text = `Hello World!`; \n console.log(text)")
                 break;
             case 'java':
-                editorref.current.setValue("/* HelloWorld.java\n */\n\npublic class HelloWorld\n{\n…rgs) {\n\t\tSystem.out.println('Hello World!');\n\t}\n}")
+                editorref?.current.setValue("/* HelloWorld.java\n */\n\npublic class HelloWorld\n{\n…rgs) {\n\t\tSystem.out.println('Hello World!');\n\t}\n}")
             default:
                 break;
         }
@@ -268,7 +280,7 @@ export default function Editorpage() {
     }
     const handleKick = (e) => {
         let socketId = e.target.getAttribute('name');
-        let username = e.target
+        let username = e.target.value;
         console.log(username)
         console.log(socketId)
         if (ClientEmails && ClientEmails[socketId]) {
@@ -284,8 +296,89 @@ export default function Editorpage() {
             })
         }
     }
+    const handleRTPCapabilities = () => {
+        socket.current.emit("getRtpCapabilities", (data) => {
+            console.log(`Router RTPCapabilities=>${data}`)
+            setRtpCapability(data)
+            createDevice(data)
+        })
+    }
+    const createSendTransport = async () => {
+        // see server's socket.on('createWebRtcTransport', sender?, ...)
+        // this is a call from Producer, so sender = true
+        socket.emit('createWebRtcTransport', { sender: true }, ({ params }) => {
+            // The server sends back params needed 
+            // to create Send Transport on the client side
+            if (params.error) {
+                console.log(params.error)
+                return
+            }
+
+            console.log(params)
+
+            // creates a new WebRTC Transport to send media
+            // based on the server's producer transport params
+            // https://mediasoup.org/documentation/v3/mediasoup-client/api/#TransportOptions
+            producer.current = (device.createSendTransport(params))
+
+            // https://mediasoup.org/documentation/v3/communication-between-client-and-server/#producing-media
+            // this event is raised when a first call to transport.produce() is made
+            // see connectSendTransport() below
+            producer.current.on('connect', async ({ dtlsParameters }, callback, errback) => {
+                try {
+                    // Signal local DTLS parameters to the server side transport
+                    // see server's socket.on('transport-connect', ...)
+                    await socket.current.emit('transport-connect', {
+                        dtlsParameters,
+                    })
+
+                    // Tell the transport that parameters were transmitted.
+                    callback()
+
+                } catch (error) {
+                    errback(error)
+                }
+            })
+
+            producer.current.on('produce', async (parameters, callback, errback) => {
+                console.log(parameters)
+
+                try {
+                    // tell the server to create a Producer
+                    // with the following parameters and produce
+                    // and expect back a server side producer id
+                    // see server's socket.on('transport-produce', ...)
+                    await socket.current.emit('transport-produce', {
+                        kind: parameters.kind,
+                        rtpParameters: parameters.rtpParameters,
+                        appData: parameters.appData,
+                    }, ({ id }) => {
+                        // Tell the transport that parameters were transmitted and provide it with the
+                        // server side producer's id.
+                        callback({ id })
+                    })
+                } catch (error) {
+                    errback(error)
+                }
+            })
+        })
+    }
+
     const handleFileShare = (e) => {
+        const filename = 'profile.jpg';
         console.log(e.target.value);
+        const readStream = fs.createReadStream();
+
+        // Send chunks of data to the client as they become available
+        readStream.on('data', (chunk) => {
+            socket.emit('fileChunk', chunk);
+        });
+
+        // Notify the client when the file streaming is complete
+        readStream.on('end', () => {
+            socket.emit('fileEnd');
+            console.log('File streaming complete');
+        });
     }
     // console.log(location.state)
     // console.log(mode)
@@ -348,9 +441,9 @@ export default function Editorpage() {
                             <input type="submit" id="send" className="send" onClick={sendMsg} value={"send"}></input>
 
                             <Manualtippy placement='top' content='Share File'>
-                                <label htmlFor="file" className="sendicon" onClick={handleFileShare}><AiOutlinePlus size={'30px'} fontSize={'100'} /></label>
+                                <label htmlFor="file" className="sendicon" onClick={handleRTPCapabilities}><AiOutlinePlus size={'30px'} fontSize={'100'} /></label>
                             </Manualtippy>
-                            <input type="file" className="file send" id="file" ></input>
+                            <input type="button" className="file send" id="file" ></input>
                         </div>
                     </form>
                 </div>
@@ -400,7 +493,7 @@ export default function Editorpage() {
                                         <MenuItem onClick={(role == 'owner' && access) && handlePromote} isDisabled={!(role == 'owner' && access)} background={'transparent'} name={item.socketId} color={'rgb(99,198,99)'} backdropBlur={'10px'} icon={<AiOutlineArrowUp />} command='⌘T'>
                                             Promote to Co-Host
                                         </MenuItem>
-                                        <MenuItem onClick={(role == 'owner' && access) && handleKick} isDisabled={!(role == 'owner' && access)} background={'transparent'} name={item.socketId} backdropBlur={'10px'} icon={<AiOutlineArrowDown />} command='⌘T'>
+                                        <MenuItem onClick={(role == 'owner' && access) && handleKick} isDisabled={!(role == 'owner' && access)} background={'transparent'} value={item.username} name={item.socketId} backdropBlur={'10px'} icon={<AiOutlineArrowDown />} command='⌘T'>
                                             Kick Out from Room!
                                         </MenuItem>
                                         {/* <MenuItem background={'transparent'} backdropBlur={'10px'} icon={<AiOutlineArrowDown />} command='⌘T'>

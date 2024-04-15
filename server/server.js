@@ -21,6 +21,9 @@ const { GetRoom } = require("./controller/GetRoom");
 
 const Room = require("./Schema/room");
 const { checkKickedUser } = require("./middleware/checkKicked");
+const { createWorker, createRouter, mediaCodes } = require("./config/worker");
+const RTPHandlers = require("./controller/RTPRoutes")
+// const router=require("./'")
 
 // app.use(require('express-status-monitor')(
 //     { port: 3003 ,socketPath:'/statusst'}
@@ -42,6 +45,13 @@ const io = new Server(server, {
         credentials: true
     }
 });
+
+async function workerInstance() {
+    return await createWorker()
+}
+const worker = workerInstance()
+let router;
+
 //Middleware used for rectifying request
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }))
@@ -161,8 +171,11 @@ io.use(async (socket, next) => {
 })
 io.use((socket, next) => checkKickedUser(socket, next))
 
-io.on('connection', (socket) => {
-    socket.on("UserJoin", async ({ RoomId, username, email, role }) => {
+io.on('connection', async (socket) => {
+    socket.on("UserJoin", async ({ RoomId, username, email, role }, callback) => {
+        router = await createRouter(worker)
+        let rtpCapabilities = await router.rtpCapabilities
+        callback({ rtpCapabilities })
         console.log('USERJOINED')
         if (role == 'owner' || role == 'cohost') {
             await pub.hsetnx(`room:${RoomId}`, 'info', JSON.stringify({ owner: email, role }))
@@ -250,7 +263,7 @@ io.on('connection', (socket) => {
         console.log('language=>', language, code);
         var config = {
             method: 'post',
-            url: process.env.COMPILE_URL || 'http://localhost:3000' || 'api.codex.jagraav.in' || '',
+            url: process.env.COMPILE_URL ||  'api.codex.jagraav.in' || '',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
@@ -297,6 +310,43 @@ io.on('connection', (socket) => {
         }
     });
 
+
+    // console.log(worker)
+    // router = await (await worker).createRouter({ mediaCodecs: mediaCodes })
+    //     .then((res) => {
+    //         console.log
+    //         // console.log('Router Created=>', res.rtpCapabilities);
+    //         return res;
+    //     })
+
+
+
+    // router = await createRouter(worker)
+
+
+    // socket.on('getRtpCapabilities', async (callback) => {
+    //     console.log(`Here's the =>${JSON.stringify(router)}`)
+
+    //     const rtpCapabilities = await router.rtpCapabilities
+
+    //     console.log('rtp Capabilities', rtpCapabilities)
+
+    //     // call callback from the client and send back the rtpCapabilities
+    //     callback({ rtpCapabilities })
+    // })
+    RTPHandlers(socket, router);
+
+
+    // router =  (await worker).createRouter({
+    //     rtcMaxPort: 2020,
+    //     rtcMinPort: 2000,
+    //     logLevel: 'debug', // Set log level as needed
+    //     logTags: ['info', 'ice', 'dtls', 'rtp', 'srtp', 'rtcp'],
+    // }).then(res => {
+    //     console.log(res);
+    //     return res;
+    // })
+
     socket.on('disconnect', async (reason) => {
         const User = Users[socket.id];
         // console.log('room>', Users?.RoomId);
@@ -306,8 +356,8 @@ io.on('connection', (socket) => {
             // console.log("AllUser=>", await AllConnectedUser(User.RoomId).length)
             await AllConnectedUser(User?.RoomId)
                 .then(data => {
+                    console.log('expire1')
                     if (data.length == 0) {
-                        console.log('expire1')
                         CodeExpire(socket, 300)
                         // Room.index({ createdAt: 1 }, { expireAfterSeconds: 300 });
                     }

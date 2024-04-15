@@ -73,7 +73,7 @@ input:focus-visible,
 .msgBox {
     height: 250px;
     width: 100%;
-    overflow: auto;
+    overflow-x: hidden;
     display: flex;
     gap: 8px;
     padding: 8px 10px;

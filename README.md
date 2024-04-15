@@ -29,7 +29,7 @@ This is a real-time code sharing and chat application built with Node.js and Soc
    
 ## Usage
 
-Connect to the server at `http://localhost:3002` (or whatever port you have configured). Join a room and start sharing code and chatting in real-time.
+Connect to the server at `http://` (or whatever port you have configured). Join a room and start sharing code and chatting in real-time.
 
 ## Contributing
 
