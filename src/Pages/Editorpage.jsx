@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import fs from 'fs'
+// import fs from 'fs'
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Codemirror from "codemirror";
 import "codemirror/lib/codemirror.css"
@@ -12,6 +12,8 @@ import "codemirror/addon/display/autorefresh"
 import "./EditorPage.css";
 import { socketinit } from "../socket";
 import Toast, { Toaster } from "react-hot-toast";
+
+import { WebcamCapture } from "../components/webcam";
 import {
     Menu,
     MenuButton,
@@ -69,10 +71,13 @@ export default function Editorpage() {
     const [ModalValue, setModalValue] = useState({ active: false });
     const [disabled, setDisabled] = useState(false);
 
-
+    const camRef = useRef();
     const [rtpCapability, setRtpCapability] = useState();
-    const [device, setDevice] = useState();
-    const producer = useRef();
+    // const [device, setDevice] = useState();
+    const device = useRef();
+
+    const transport = useRef(null);
+    const producer = useRef(null);
 
 
     const handleRoleAccess = (role) => {
@@ -112,6 +117,8 @@ export default function Editorpage() {
             })
         };
 
+
+
         const connect = async () => {
 
             init();
@@ -140,7 +147,8 @@ export default function Editorpage() {
                 socket.current.emit('UserJoin', { RoomId, username, email, role }, (rtpCapability) => {
                     // console.log('rtpCapability=>',JSON.stringify(rtpCapability))
                     setRtpCapability(rtpCapability);
-                    createDevice(rtpCapability);
+                    device.current = createDevice(rtpCapability, device);
+                    console.log(device.current)
                 })
                 // console.log(socket.id)
 
@@ -297,77 +305,118 @@ export default function Editorpage() {
         }
     }
     const handleRTPCapabilities = () => {
-        socket.current.emit("getRtpCapabilities", (data) => {
-            console.log(`Router RTPCapabilities=>${data}`)
+        socket.current.emit("getRtpCapabilities", { RoomId }, (data) => {
+            console.log(`Router RTPCapabilities=>${JSON.stringify(data)}`)
             setRtpCapability(data)
-            createDevice(data)
+            createDevice(data, device);
+            let sender = true;
+            createSendTransport(sender)
         })
     }
-    const createSendTransport = async () => {
+    const createSendTransport = async (sender) => {
         // see server's socket.on('createWebRtcTransport', sender?, ...)
         // this is a call from Producer, so sender = true
-        socket.emit('createWebRtcTransport', { sender: true }, ({ params }) => {
+        socket.current.emit('createWebRtcTransport', { sender }, async ({ params }) => {
             // The server sends back params needed 
             // to create Send Transport on the client side
-            if (params.error) {
+            console.log(params)
+            if (params?.error) {
                 console.log(params.error)
                 return
             }
 
-            console.log(params)
+            console.log('params=>', params)
 
             // creates a new WebRTC Transport to send media
             // based on the server's producer transport params
             // https://mediasoup.org/documentation/v3/mediasoup-client/api/#TransportOptions
-            producer.current = (device.createSendTransport(params))
+            console.log(device.current)
+            transport.current = await device.current.createSendTransport({
+                ...params, iceServers: [
+                    // { urls: 'stun:stun.l.google.com:19302' },
+                    // { urls: 'stun:stun1.l.google.com:19302' },
+                    // { urls: 'stun:stun2.l.google.com:19302' },
+                    // { urls: 'stun:stun3.l.google.com:19302' },
+                    // { urls: 'turns:freeturn.tel:5349', username: 'free', credential: 'free' }
+                ]
+            });
 
             // https://mediasoup.org/documentation/v3/communication-between-client-and-server/#producing-media
             // this event is raised when a first call to transport.produce() is made
             // see connectSendTransport() below
-            producer.current.on('connect', async ({ dtlsParameters }, callback, errback) => {
-                try {
-                    // Signal local DTLS parameters to the server side transport
-                    // see server's socket.on('transport-connect', ...)
-                    await socket.current.emit('transport-connect', {
-                        dtlsParameters,
-                    })
+            console.log(producer.current)
+            if (transport?.current) {
 
-                    // Tell the transport that parameters were transmitted.
-                    callback()
+                transport.current.on('connect', ({ dtlsParameters }, callback, errback) => {
+                    console.log(dtlsParameters)
+                    socket.current.emit('transport-connect', {
+                        transportId: transport.id,
+                        dtlsParameters
+                    }, (response) => {
+                        if (response.error) {
+                            console.log("Got Some Transport Error=>", response.error);
+                            errback(response.error);
+                        } else {
+                            console.log('Transport connected successfully');
+                            callback();
+                        }
+                    });
+                });
+                transport.current.on('dtlsstatechange', (dtlsState) => {
+                    console.log(`dtlsStateChange to :${dtlsState}`)
+                    if (dtlsState === 'closed') {
+                        transport.close();
+                    }
+                });
+                transport.current.on('connectionstatechange', (state) => {
+                    console.log(`Send transport connection state changed to ${state}`);
+                    if (state === 'connected') {
+                        console.log('Send transport is connected.');
+                    } else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+                        console.error(`Send transport connection state changed to ${state}`);
+                    }
+                });
 
-                } catch (error) {
-                    errback(error)
+                transport?.current.on('produce', async (parameters, callback, errback) => {
+                    console.log(parameters)
+
+                    try {
+                        // tell the server to create a Producer
+                        // with the following parameters and produce
+                        // and expect back a server side producer id
+                        // see server's socket.on('transport-produce', ...)
+                        await socket.current.emit('transport-produce', {
+                            kind: parameters.kind,
+                            rtpParameters: parameters.rtpParameters,
+                            appData: parameters.appData,
+                        }, ({ id }) => {
+                            // Tell the transport that parameters were transmitted and provide it with the
+                            // server side producer's id.
+                            callback({ id })
+                        })
+                    } catch (error) {
+                        errback(error)
+                    }
+                })
+                if (camRef.current) {
+
+                    const stream = camRef.current.video.srcObject;
+                    console.log(camRef);
+                    const videoTrack = stream.getVideoTracks()[0];
+                    console.log(videoTrack)
+
+                    console.log('--------producing-----------')
+                    producer.current = await transport.current.produce({ track: videoTrack });
+                    console.log(producer.current.id)
                 }
-            })
-
-            producer.current.on('produce', async (parameters, callback, errback) => {
-                console.log(parameters)
-
-                try {
-                    // tell the server to create a Producer
-                    // with the following parameters and produce
-                    // and expect back a server side producer id
-                    // see server's socket.on('transport-produce', ...)
-                    await socket.current.emit('transport-produce', {
-                        kind: parameters.kind,
-                        rtpParameters: parameters.rtpParameters,
-                        appData: parameters.appData,
-                    }, ({ id }) => {
-                        // Tell the transport that parameters were transmitted and provide it with the
-                        // server side producer's id.
-                        callback({ id })
-                    })
-                } catch (error) {
-                    errback(error)
-                }
-            })
+            }
         })
     }
 
     const handleFileShare = (e) => {
         const filename = 'profile.jpg';
         console.log(e.target.value);
-        const readStream = fs.createReadStream();
+        // const readStream = fs.createReadStream();
 
         // Send chunks of data to the client as they become available
         readStream.on('data', (chunk) => {
@@ -464,6 +513,7 @@ export default function Editorpage() {
             </Box>
             <div className="realtimeeditor">
                 <textarea disabled={access} id="codeeditor"></textarea>
+                <WebcamCapture audio={true} camRef={camRef} mirrored={false} />
             </div>
         </div>
         <Drawer

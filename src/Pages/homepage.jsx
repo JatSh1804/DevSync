@@ -5,7 +5,8 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router-do
 import { v4 as uuidV4 } from "uuid"
 import Toast, { Toaster } from "react-hot-toast"
 import axios from "axios";
-
+// import {apiRoute} from "../../environment"
+import { apiRoute } from '../../environment'
 
 
 export default function Homepage() {
@@ -30,7 +31,7 @@ export default function Homepage() {
     console.log(username);
     var config = {
       method: 'POST',
-      url: '/Room',
+      url: `${apiRoute}/Room`,
       withCredentials: true,
       data: { RoomId },
       headers: {

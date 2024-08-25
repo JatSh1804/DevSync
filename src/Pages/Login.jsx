@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Toast, { Toaster } from "react-hot-toast";
+import { apiRoute } from "../../environment";
 
 function LoginPage() {
     const location = useLocation();
@@ -11,6 +12,7 @@ function LoginPage() {
     const [error, setError] = useState();
     const [response, setResponse] = useState();
     const [disabled, setDisabled] = useState(false);
+
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -22,7 +24,7 @@ function LoginPage() {
         console.log(JSON.stringify(location))
         var config = {
             method: 'POST',
-            url: '/Login',
+            url: `${apiRoute}/Login`,
             withCredentials: true,
 
             headers: {
@@ -48,7 +50,8 @@ function LoginPage() {
             <h1 className="Hero">Log In</h1>
             <input type="text" placeholder="Email" value={Email} onChange={e => setEmail(e.target.value)}></input>
             <input type="password" placeholder="Password" value={Password} onChange={e => setPassword(e.target.value)}></input>
-            <input className={`success prevent ${disabled && 'disabled'}`} disabled={disabled} type="submit" value='Submit' onClick={handleLogin}></input>
+            <input className={`success prevent ${disabled && 'disabled'
+                }`} disabled={disabled} type="submit" value='Submit' onClick={handleLogin}></input>
         </form>
         <span className="separator flex grey">
             <div></div>

@@ -5,7 +5,7 @@ const secret_key = process.env.SECRET_KEY || 'devsync';
 
 const { GetCred } = require('../controller/db')
 
-const maxAge = 360000 * 1000
+const maxAge = 360000 * 10000
 async function Login(req, response) {
     const { Email, Password } = req.body;
     console.log('Email=>', Email, Password)

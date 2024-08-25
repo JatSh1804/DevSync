@@ -40,19 +40,24 @@ async function createWorker() {
     }
 }
 
-async function createRouter(worker) {
+async function createRouter(worker, rooms, RoomId) {
     try {
         const workerInstance = await worker;
         if (!workerInstance) {
             throw new Error('Worker is not initialized');
         }
         console.log(workerInstance);
-        const router = await workerInstance.createRouter({ mediaCodecs: mediaCodes });
-        router.on("close", () => {
-            console.log("Mediasoup router closed.");
-            // Handle router close event if needed
-        });
-        console.log('Router created successfully');
+
+        let router = rooms.get(RoomId);
+        if (!router) {
+            router = await workerInstance.createRouter({ mediaCodecs: mediaCodes });
+            rooms.set(RoomId, router)
+            router.on("close", () => {
+                console.log("Mediasoup router closed.");
+                // Handle router close event if needed
+            });
+            console.log('Router created successfully');
+        }
         return router;
     } catch (error) {
         console.error('Error creating Mediasoup router:', error);

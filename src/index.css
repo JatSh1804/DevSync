@@ -1,5 +1,8 @@
 /* $primary-colour:'RGB(1, 172, 192)'
 $secondary-colour:RGB(33, 36, 41)*/
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 * {
   margin: 0;

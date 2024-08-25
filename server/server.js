@@ -2,10 +2,16 @@ const express = require("express")
 const app = express();
 
 const { createServer } = require("node:http");
-const server = createServer(app);
+const fs = require('fs')
+const path = require("path")
+const options = {
+    key: fs.readFileSync(path.join(__dirname, './ssl/server-key.pem'), 'utf-8'),
+    cert: fs.readFileSync(path.join(__dirname, './ssl/server-cert.pem'), 'utf-8')
+}
+
+const server = createServer(options, app);
 const { Server } = require("socket.io")
 const { pub, sub } = require("./client")
-const path = require("path")
 const cors = require("cors");
 const axios = require("axios");
 const qs = require("qs");
@@ -60,6 +66,7 @@ app.use(cookieParser())
 
 app.use(express.static('./dist'));
 app.get('*', (req, res, next) => {
+    console.log("received...");
     res.sendFile(path.join(__dirname, './dist', 'index.html'));
 });
 
@@ -171,10 +178,17 @@ io.use(async (socket, next) => {
 })
 io.use((socket, next) => checkKickedUser(socket, next))
 
+
+let rooms = new Map();
+let transports = new Map();
+let producer = [];
+let consumer = [];
+
+
 io.on('connection', async (socket) => {
     socket.on("UserJoin", async ({ RoomId, username, email, role }, callback) => {
-        router = await createRouter(worker)
-        let rtpCapabilities = await router.rtpCapabilities
+        const Router = await createRouter(worker, rooms, RoomId)
+        let rtpCapabilities = await Router.rtpCapabilities
         callback({ rtpCapabilities })
         console.log('USERJOINED')
         if (role == 'owner' || role == 'cohost') {
@@ -199,8 +213,8 @@ io.on('connection', async (socket) => {
                     socket.emit("Code Sync", { code: res.code, username: res.username });
                     return res;
                 })
-            // const room = await Room.findOne({ RoomId });
-            // room.createdAt = undefined;
+            const room = await Room.findOne({ RoomId });
+            room.createdAt = undefined;
 
             // Save the updated room document
             await room.save();
@@ -263,7 +277,7 @@ io.on('connection', async (socket) => {
         console.log('language=>', language, code);
         var config = {
             method: 'post',
-            url: process.env.COMPILE_URL ||  'api.codex.jagraav.in' || '',
+            url: process.env.COMPILE_URL || 'http://api.codex.jagraav.in' || '',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
@@ -334,7 +348,8 @@ io.on('connection', async (socket) => {
     //     // call callback from the client and send back the rtpCapabilities
     //     callback({ rtpCapabilities })
     // })
-    RTPHandlers(socket, router);
+
+    RTPHandlers(worker, socket, rooms, producer, consumer, transports);
 
 
     // router =  (await worker).createRouter({

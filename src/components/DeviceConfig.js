@@ -1,19 +1,21 @@
 import { Device } from "mediasoup-client"
-export default async function createDevice(rtpCapability) {
+export default async function createDevice(rtpCapability, device) {
     try {
         // Create a new device
-        const device = new Device();
+        device.current = new Device();
 
         // Initialize the device
-        await device.load({
+        console.log(rtpCapability);
+        await device.current.load({
             // Specify the router RTP capabilities
-            routerRtpCapabilities: rtpCapability,
+            routerRtpCapabilities: rtpCapability.rtpCapabilities,
 
             // Specify the transport options (optional)
             // transportOptions: {/* Transport options */}
+        }).then(() => {
+            console.log(device.current.createSendTransport)
+            console.log('Mediasoup client device created successfully');
         });
-
-        console.log('Mediasoup client device created successfully');
         return device;
     } catch (error) {
         console.error('Error creating Mediasoup client device:', error);

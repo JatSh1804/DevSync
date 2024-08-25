@@ -2,6 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import { useLocation, Link } from "react-router-dom";
 import Toast, { Toaster } from "react-hot-toast";
+import { apiRoute } from "../../environment";
 function SignupPage() {
     const location = useLocation();
     const [Username, setUsername] = useState('');
@@ -12,7 +13,7 @@ function SignupPage() {
         e.preventDefault();
         var config = {
             method: 'post',
-            url: '/Signup',
+            url: `${apiRoute}/Signup`,
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
