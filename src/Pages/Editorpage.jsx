@@ -277,6 +277,7 @@ export default function Editorpage() {
     const compile = async (e) => {
         e.preventDefault();
         setDisabled(true);
+        console.log(codeRef.current);
         socket.current.emit("Compile", { code: codeRef.current, RoomId, language: mode[0], input: "" })
         setTimeout(() => { setDisabled(false); }, 5000)
     }

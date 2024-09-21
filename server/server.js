@@ -1,6 +1,6 @@
 const express = require("express")
 const app = express();
-
+require('dotenv').config();
 const { createServer } = require("node:http");
 const fs = require('fs')
 const path = require("path")
@@ -269,19 +269,21 @@ io.on('connection', async (socket) => {
         }
     })
     socket.on("Compile", async ({ code, language, input, RoomId }) => {
+        console.log(code);
         var data = qs.stringify({
             code: code,
             language: language,
             input: input || ''
         });
         console.log('language=>', language, code);
+        console.log()
         var config = {
             method: 'post',
             url: process.env.COMPILE_URL || 'http://api.codex.jagraav.in' || '',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
-            data: data
+            data:data
         };
 
         await axios(config)
