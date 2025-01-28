@@ -2,220 +2,93 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
-* {
-  margin: 0;
-  padding: 0;
-  border: none;
-  transition: all 0.1s ease;
-  border-color: rgb(39, 39, 42, 1);
+body {
+  height: 100vh;
 }
 
-select option {
-  background: green;
+#root {
+  height: 100%;
 }
+
 
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: hsl(240 4.8% 95.9%);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-html {
-  height: 100vh;
-  width: fit-content;
-}
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 10% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem
+  }
 
-body {
-  height: 100vh;
-  width: 100vw;
-  background: rgb(3 7 18) !important;
-  color: white !important;
-}
-
-.Hero {
-  font-family: "Playfair Display", serif;
-  font-optical-sizing: auto;
-  font-style: normal;
-  background: rgb(122, 241, 194);
-  background: linear-gradient(90deg, rgba(122, 241, 194, 1) 17%, rgba(98, 234, 240, 1) 22%, rgba(77, 160, 196, 1) 28%, rgba(65, 143, 186, 1) 37%, rgba(95, 152, 210, 1) 45%, rgba(31, 197, 240, 1) 56%, rgba(105, 127, 250, 1) 65%, rgba(126, 75, 214, 1) 82%);
-  background-clip: text;
-  color: white;
-  display: inline-block;
-  font-weight: 700;
-  font-size: calc(4em+4vw);
-}
-
-.rainbow {
-  background: rgb(122, 241, 194);
-  background: linear-gradient(90deg, rgba(122, 241, 194, 1) 17%, rgba(98, 234, 240, 1) 22%, rgba(77, 160, 196, 1) 28%, rgba(65, 143, 186, 1) 37%, rgba(95, 152, 210, 1) 45%, rgba(31, 197, 240, 1) 56%, rgba(105, 127, 250, 1) 65%, rgba(126, 75, 214, 1) 82%);
-  background-clip: text;
-  color: grey;
-  font-weight: 500;
-}
-
-.Hero>span {
-  display: block;
-}
-
-.Navbar {
-  width: 100vw;
-  padding: 5px 20px;
-  position: fixed;
-}
-
-.flex {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.flex.grey {
-  display: flex;
-  gap: 5px;
-  font-weight: 600;
-  font-size: clamp(20px, 1em, 50px);
-}
-
-.heading {
-  font-size: 2.75rem;
-}
-
-
-.logo {
-  height: 7vh;
-  width: 180px;
-}
-
-.grey {
-  color: rgb(161, 161, 170, 0.6);
-}
-
-input {
-  padding: 10px 5px;
-  border-radius: 5px;
-  background-color: transparent;
-  color: white;
-  border: 1px solid rgb(161, 161, 170, 0.6);
-}
-
-input:active,
-:focus-visible {
-  border: 1px solid rgb(159, 159, 159);
-}
-
-button {
-  padding: 10px 20px;
-  border-radius: 5px;
-}
-
-.separator {
-  margin-bottom: 10px;
-  padding: 0 37%;
-  opacity: 0.3;
-}
-
-.separator div {
-  height: 1.5px;
-  width: 100%;
-  background-color: rgb(161, 161, 170, 1);
-}
-
-.success {
-  background: rgb(99, 198, 99);
-  transition: transform 0.2s ease;
-}
-
-.success:hover {
-  background-color: rgb(126, 209, 126);
-}
-
-.success:active {
-  transform: scale(0.986);
-  opacity: 0.75;
-}
-
-.prevent.success:disabled.success:disabled {
-  cursor: not-allowed;
-}
-
-.error {
-  background: rgb(216, 79, 79);
-}
-
-.error:active {
-  background-color: rgb(216, 79, 79, 0.75);
-}
-
-.inactive {
-  opacity: 0.3;
-}
-
-.underline.link {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  display: inline;
-  position: relative;
-  color: rgb(136, 239, 136);
-}
-
-.underline.link::before {
-  content: '';
-  position: absolute;
-  width: 100%;
-  height: 2px;
-  transform: scaleX(0);
-  background-color: rgb(136, 239, 136);
-  transition: width 0.3s ease, transform 0.2s ease;
-  bottom: 0;
-  transform-origin: right;
-}
-
-.underline.link:hover::before {
-  transform: scaleX(1);
-  transform-origin: left;
-}
-
-body a {
-  text-decoration: none;
-  color: #FFF;
-}
-
-.rainbow-button {
-  width: fit-content;
-  height: fit-content;
-  padding: 3px;
-  background-image: linear-gradient(90deg, #00C0FF 0%, #FFCF00 49%, #FC4F4F 80%, #00C0FF 100%);
-  border-radius: 25px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-}
-
-.rainbow-button:after {
-  content: attr(alt);
-  padding: 3px 25px;
-  background-color: #191919;
-  display: flex;
-  align-items: center;
-  border-radius: 25px;
-  justify-content: center;
-  transition: all 0.12 ease;
-}
-
-
-.rainbow-button:hover {
-  animation: slidebg 7s linear infinite forwards;
-  transform: translateY(1.2px);
-}
-
-@keyframes slidebg {
-  to {
-    background-position: 20vw;
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%
   }
 }
 
-.disabled {
-  background-color: grey !important;
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
 }
-*/

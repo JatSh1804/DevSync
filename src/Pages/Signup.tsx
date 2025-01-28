@@ -1,3 +1,4 @@
+import * as React from "react"
 import { useState } from "react";
 import axios from "axios";
 import { useLocation, Link } from "react-router-dom";
@@ -5,9 +6,9 @@ import Toast, { Toaster } from "react-hot-toast";
 import { apiRoute } from "../../environment";
 function SignupPage() {
     const location = useLocation();
-    const [Username, setUsername] = useState('');
-    const [Password, setPassword] = useState('');
-    const [Email, setEmail] = useState('');
+    const [Username, setUsername] = React.useState('');
+    const [Password, setPassword] = React.useState('');
+    const [Email, setEmail] = React.useState('');
 
     const handleSignUp = async (e) => {
         e.preventDefault();
@@ -37,7 +38,7 @@ function SignupPage() {
             <input placeholder="Password" type="Password" value={Password} onChange={e => setPassword(e.target.value)}></input>
             <input className="success" type="submit" value='Submit' onClick={handleSignUp}></input>
         </form>
-        <Link to="/login" state={location.state} alt="Login">Login</Link>
+        <Link to="/login" state={location.state} >Login</Link>
     </>
 }
 export default SignupPage;

@@ -13,7 +13,7 @@ export default function Homepage() {
   const location = useLocation();
   const [queryRoom, setqueryRoom] = useSearchParams();
   const navigate = useNavigate();
-  const date = new Date();
+  // const date = new Date();
 
   const [RoomId, setRoomID] = useState(queryRoom.get('room') || location?.state?.RoomId || '');
   const [username, setUsername] = useState(location?.state?.username || '');
@@ -101,7 +101,7 @@ export default function Homepage() {
           <h1
             className="bg-gradient-to-r from-green-300 via-blue-500 to-purple-600 bg-clip-text text-7xl font-extrabold text-transparent sm:text-5xl"
           >
-            Want to Build?
+            Want to built?
             <span className="sm:block">Collaborate. Interact. Develop. </span>
           </h1>
 
@@ -196,9 +196,9 @@ export default function Homepage() {
         <div className="container">
           <p className="rainbow">Join a Room</p>
           <form className="homeForm">
-            <input value={RoomId} onChange={e => { setRoomID(e.target.value) }} placeholder='Enter Room Code' size='md' />
-            <input value={username} onChange={e => { setUsername(e.target.value) }} placeholder='USERNAME' size='md' />
-            <input type="submit" disabled={disabled} className={`${disabled && 'disabled'} prevent success`} onClick={onSubmit} variant='outline' background={'teal'} value="Join" />
+            <input value={RoomId} onChange={e => { setRoomID(e.target.value) }} placeholder='Enter Room Code' />
+            <input value={username} onChange={e => { setUsername(e.target.value) }} placeholder='USERNAME' />
+            <input type="submit" disabled={disabled} className={`${disabled && 'disabled'} prevent success`} onClick={onSubmit} value="Join" />
           </form>
         </div>
         <div className="buttonDiv">
@@ -209,7 +209,7 @@ export default function Homepage() {
           </span>
         </div>
         <p className="grey">Don't have a Room? &nbsp;
-          <Link to="/Create" className="underline link" colorscheme='teal' variant='link'>Create Room</Link>
+          <Link to="/Create" className="underline link" >Create Room</Link>
         </p>
       </div>
     </div>

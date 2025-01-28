@@ -1,3 +1,4 @@
+import * as React from "react";
 import { useDisclosure, Modal, ModalOverlay, ModalContent, ModalHeader, ModalCloseButton, ModalBody, ModalFooter, Button } from "@chakra-ui/react"
 import { useEffect, useState } from "react";
 export function ManualClose(props) {
@@ -30,7 +31,7 @@ export function ManualClose(props) {
     }
     return (
         <>
-            {/* <Button onClick={onOpen}>Open Modal</Button> */}
+            <Button onClick={onOpen}>Open Modal</Button>
             <Modal closeOnOverlayClick={false} isOpen={isOpen} onClose={onClose}>
                 <ModalOverlay bg='blackAlpha.300' backdropFilter='blur(5px)' />
                 <ModalContent bg='blackAlpha.500'>

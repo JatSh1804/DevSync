@@ -65,13 +65,27 @@ app.use(express.urlencoded({ extended: false }))
 app.use(cookieParser())
 
 app.use(express.static('./dist'));
+
+app.get('/api/auth/verify', (req, res) => {
+    authenticate(req.headers?.authorization?.split(' ')[1] || req.cookies?.token)
+        .then(decoded => {
+            console.log("Logged In")
+            res.json({ loggedIn: true, ...decoded })
+        })
+        .catch(err => {
+            console.log("Not Logged In")
+
+            res.status(401).json({ loggedIn: false, ...err })
+        })
+});
+
 app.get('*', (req, res, next) => {
     console.log("received...");
     res.sendFile(path.join(__dirname, './dist', 'index.html'));
 });
 
-app.post("/Signup", (req, res) => SignUp(req, res));
-app.post("/Login", (req, res) => Login(req, res));
+app.post("/Login", Login);
+app.post("/Signup", SignUp)
 app.post('/user', (req, res) => {
     authenticate(req.headers?.authorization?.split(' ')[1] || req.cookies?.token)
         .then(decoded => {
@@ -85,7 +99,7 @@ app.post('/Room',
     (req, res) => GetRoom(req, res)
 )
 
-mongoose.connect(process.env.MONGODB || 'mongodb+srv://jatin1804sharma:jatin1234@cluster0.9ynjhkt.mongodb.net/User' || '')
+mongoose.connect(process.env.MONGODB || '')
     .then(() => { console.log('Connected!') });
 
 const Users = [];
@@ -283,7 +297,7 @@ io.on('connection', async (socket) => {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
-            data:data
+            data: data
         };
 
         await axios(config)

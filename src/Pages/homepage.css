@@ -14,7 +14,7 @@
 }
 
 .homeForm {
-    /* margin: auto; */
+
     display: flex;
     padding: 20px;
     flex-direction: column;
@@ -35,7 +35,5 @@
 }
 
 .homeForm input:focus-visible {
-    /* outline: 2px rgb(99,198,99) solid;
-    outline-offset: 1px; */
     box-shadow: 5px 5px #fff;
 }

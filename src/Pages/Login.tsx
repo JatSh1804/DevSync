@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import * as React from "react"
+// import { useState } from "react";
 import axios from "axios";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import Toast, { Toaster } from "react-hot-toast";
@@ -7,11 +8,11 @@ import { apiRoute } from "../../environment";
 function LoginPage() {
     const location = useLocation();
     const navigate = useNavigate();
-    const [Email, setEmail] = useState('');
-    const [Password, setPassword] = useState('');
-    const [error, setError] = useState();
-    const [response, setResponse] = useState();
-    const [disabled, setDisabled] = useState(false);
+    const [Email, setEmail] = React.useState('');
+    const [Password, setPassword] = React.useState('');
+    const [error, setError] = React.useState();
+    const [response, setResponse] = React.useState();
+    const [disabled, setDisabled] = React.useState(false);
 
 
     const handleLogin = async (e) => {
@@ -37,7 +38,7 @@ function LoginPage() {
             .then(res => {
                 console.log(JSON.stringify(res.data))
                 setResponse(res)
-                setTimeout(() => { navigate('/', { state: location.state }) }, 2000)
+                setTimeout(() => { navigate(`/?room=${location.state.roomId}.`, { state: location.state }) }, 2000)
             })
             .catch(err => {
                 console.error(err.response?.data.message)
