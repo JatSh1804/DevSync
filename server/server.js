@@ -195,69 +195,91 @@ io.use((socket, next) => checkKickedUser(socket, next))
 
 let rooms = new Map();
 let transports = new Map();
-let producer = [];
-let consumer = [];
+let producers = new Map();  // Change from array to Map
+let consumers = new Map();  // Change from array to Map
 
+// Create a helper function to initialize mediasoup resources for a room
+const initializeMediasoupRoom = async (roomId, worker) => {
+    if (!rooms.has(roomId)) {
+        const router = await createRouter(worker, rooms, roomId);
+        console.log(`Created new mediasoup router for room ${roomId}`);
+        return router;
+    }
+    return rooms.get(roomId);
+};
 
 io.on('connection', async (socket) => {
+    // Fix userJoin to properly initialize mediasoup resources
     socket.on("UserJoin", async ({ RoomId, username, email, role }, callback) => {
-        const Router = await createRouter(worker, rooms, RoomId)
-        let rtpCapabilities = await Router.rtpCapabilities
-        callback({ rtpCapabilities })
-        console.log('USERJOINED')
-        if (role == 'owner' || role == 'cohost') {
-            await pub.hsetnx(`room:${RoomId}`, 'info', JSON.stringify({ owner: email, role }))
-            await pub.hset(`room:${RoomId}`, 'socket', socket.id)
-        }
-        sub.subscribe(RoomId);
-        Users[socket.id] = { username, RoomId };
-        socket.join(RoomId);
-        await pub.hset(`room:${RoomId}:users`, socket.id, `${username}/${role}/${socket.data.authenticated_email}`)
-
-        console.log({ RoomId, username, socketid: socket.id })
-        console.log(Users);
-        // console.log(client)
-        await RedisPublish(RoomId, "JOIN", { RoomId, username, socket: socket.id, email: socket.data.authenticated_email, role })
         try {
-            const lastCode = await pub.hget(`room:${RoomId}`, 'lastCode')
-                .then(res => JSON.parse(res))
-                .then(res => {
-                    pub.persist(`room:${RoomId}`)
-                    console.log(res.code);
-                    socket.emit("Code Sync", { code: res.code, username: res.username });
-                    return res;
-                })
-            const room = await Room.findOne({ RoomId });
-            room.createdAt = undefined;
-
-            // Save the updated room document
-            await room.save();
-
-            console.log(`Expiration time removed for room ${RoomId} when user ${username} joined`)
-
-        } catch (error) {
-            console.log("Last Code doesn't exists.")
-        }
-        try {
-            await pub.hget(`room:${RoomId}`, 'info')
-                .then(res => JSON.parse(res))
-                .then(async res => {
-                    console.log('email=>', socket.data.authenticated_email)
-                    console.log(res)
-                    if (socket.data.authenticated_email == res.owner) {
-                        io.to(socket.id).emit('ROLE', { role: 'owner', access: {} });
-                        await pub.hset(`room:${RoomId}`, 'socket', socket.id)
-                        // socket.to(socket).emit("ROLE", { role: 'owner', access: {} });
-                        console.log("Role Send for the user when Owner joined in \n");
+            // Initialize mediasoup router for this room
+            const router = await initializeMediasoupRoom(RoomId, await worker);
+            const rtpCapabilities = router.rtpCapabilities;
+            
+            console.log('USERJOINED with RTP capabilities:', {
+                roomId: RoomId,
+                username,
+                hasRouter: !!router
+            });
+            
+            callback({ rtpCapabilities });
+            
+            if (role == 'owner' || role == 'cohost') {
+                await pub.hsetnx(`room:${RoomId}`, 'info', JSON.stringify({ owner: email, role }))
+                await pub.hset(`room:${RoomId}`, 'socket', socket.id)
+            }
+            sub.subscribe(RoomId);
+            Users[socket.id] = { username, RoomId };
+            socket.join(RoomId);
+            await pub.hset(`room:${RoomId}:users`, socket.id, `${username}/${role}/${socket.data.authenticated_email}`)
+    
+            console.log({ RoomId, username, socketid: socket.id })
+            console.log(Users);
+            // console.log(client)
+            await RedisPublish(RoomId, "JOIN", { RoomId, username, socket: socket.id, email: socket.data.authenticated_email, role })
+            try {
+                const lastCode = await pub.hget(`room:${RoomId}`, 'lastCode')
+                    .then(res => JSON.parse(res))
+                    .then(res => {
+                        pub.persist(`room:${RoomId}`)
+                        console.log(res.code);
+                        socket.emit("Code Sync", { code: res.code, username: res.username });
+                        return res;
+                    })
+                const room = await Room.findOne({ RoomId });
+                room.createdAt = undefined;
+    
+                // Save the updated room document
+                await room.save();
+    
+                console.log(`Expiration time removed for room ${RoomId} when user ${username} joined`)
+    
+            } catch (error) {
+                console.log("Last Code doesn't exists.")
+            }
+            try {
+                await pub.hget(`room:${RoomId}`, 'info')
+                    .then(res => JSON.parse(res))
+                    .then(async res => {
+                        console.log('email=>', socket.data.authenticated_email)
+                        console.log(res)
+                        if (socket.data.authenticated_email == res.owner) {
+                            io.to(socket.id).emit('ROLE', { role: 'owner', access: {} });
+                            await pub.hset(`room:${RoomId}`, 'socket', socket.id)
+                            // socket.to(socket).emit("ROLE", { role: 'owner', access: {} });
+                            console.log("Role Send for the user when Owner joined in \n");
+                        }
                     }
-                }
-                )
+                    )
+            } catch (error) {
+                console.log("ROLE ACCESS ERROR=>", error)
+    
+            }
         } catch (error) {
-            console.log("ROLE ACCESS ERROR=>", error)
-
+            console.error('Error in UserJoin:', error);
+            callback({ error: error.message });
         }
     })
-
 
     socket.on("Code Change", async ({ RoomId, language, code, username }) => {
         await pub.hset(`room:${RoomId}`, 'lastCode', JSON.stringify({ code, language, username, socketId: socket.id }))
@@ -341,43 +363,25 @@ io.on('connection', async (socket) => {
     });
 
 
-    // console.log(worker)
-    // router = await (await worker).createRouter({ mediaCodecs: mediaCodes })
-    //     .then((res) => {
-    //         console.log
-    //         // console.log('Router Created=>', res.rtpCapabilities);
-    //         return res;
-    //     })
+
+    RTPHandlers(worker, socket, rooms, producers, consumers, transports);
+    // Add this to your main server file or where you initialize socket.io
+    const cleanupInterval = setInterval(() => {
+        const now = Date.now();
+        for (const [transportId, transport] of transports.entries()) {
+            // Close transports that are older than 1 hour and not connected
+            if (transport.appData.timestamp && (now - transport.appData.timestamp > 3600000)) {
+                if (transport.dtlsState !== 'connected') {
+                    console.log(`Cleaning up stale transport: ${transportId}`);
+                    transport.close();
+                    transports.delete(transportId);
+                }
+            }
+        }
+    }, 300000); // Run every 5 minutes
 
 
-
-    // router = await createRouter(worker)
-
-
-    // socket.on('getRtpCapabilities', async (callback) => {
-    //     console.log(`Here's the =>${JSON.stringify(router)}`)
-
-    //     const rtpCapabilities = await router.rtpCapabilities
-
-    //     console.log('rtp Capabilities', rtpCapabilities)
-
-    //     // call callback from the client and send back the rtpCapabilities
-    //     callback({ rtpCapabilities })
-    // })
-
-    RTPHandlers(worker, socket, rooms, producer, consumer, transports);
-
-
-    // router =  (await worker).createRouter({
-    //     rtcMaxPort: 2020,
-    //     rtcMinPort: 2000,
-    //     logLevel: 'debug', // Set log level as needed
-    //     logTags: ['info', 'ice', 'dtls', 'rtp', 'srtp', 'rtcp'],
-    // }).then(res => {
-    //     console.log(res);
-    //     return res;
-    // })
-
+    // Add room cleanup when all users leave
     socket.on('disconnect', async (reason) => {
         const User = Users[socket.id];
         // console.log('room>', Users?.RoomId);
@@ -389,8 +393,14 @@ io.on('connection', async (socket) => {
                 .then(data => {
                     console.log('expire1')
                     if (data.length == 0) {
-                        CodeExpire(socket, 300)
-                        // Room.index({ createdAt: 1 }, { expireAfterSeconds: 300 });
+                        CodeExpire(socket, 300);
+                        
+                        // Close mediasoup resources for this room
+                        if (rooms.has(User?.RoomId)) {
+                            console.log(`Closing mediasoup router for empty room ${User?.RoomId}`);
+                            // Keep the router in the map, but clean up associated resources
+                            // Don't close the router itself to avoid issues with reconnections
+                        }
                     }
                 })
             delete Users[socket.id]

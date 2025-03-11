@@ -19,11 +19,8 @@ const getLocalIp = () => {
   return localIp
 }
 
-const createWebRtcTransport = async (socket, worker, rooms, RoomId, callback, transports) => {
-  try {
-    // https://mediasoup.org/documentation/v3/mediasoup/api/#WebRtcTransportOptions
 
-    const webRtcTransport_options = {
+    const webRtcTransportOptions = {
       listenIps: [
         {
           ip: '0.0.0.0', // replace with relevant IP address
@@ -34,27 +31,43 @@ const createWebRtcTransport = async (socket, worker, rooms, RoomId, callback, tr
       enableUdp: true,
       // enableTcp: true,
       preferUdp: true,
-      // iceServers: [
-      //   { urls: 'stun:stun.l.google.com:19302' },
-      //   // { urls: 'stun:stun1.l.google.com:19302' },
-      //   // { urls: 'stun:stun2.l.google.com:19302' },
-      //   // { urls: 'stun:stun3.l.google.com:19302' },
-      //   // { urls: 'turns:freeturn.tel:5349', username: 'free', credential: 'free' }
-      // ]
     }
-    const router = await createRouter(worker, rooms, RoomId)
+const createWebRtcTransport = async (socket, worker, rooms, RoomId, callback, transports) => {
+  try {
+    // https://mediasoup.org/documentation/v3/mediasoup/api/#WebRtcTransportOptions
+    const router = await createRouter(worker, rooms, RoomId);
+    if (!router) {
+      throw new Error(`Failed to get/create router for room: ${RoomId}`);
+    }
 
-    // https://mediasoup.org/documentation/v3/mediasoup/api/#router-createWebRtcTransport
-    let transport = await router.createWebRtcTransport(webRtcTransport_options)
+    
+    // Create the transport with retry logic
+    let transport;
+    let retryCount = 0;
+    const maxRetries = 3;
 
-    transports.set(socket.id, transport);
-    console.log(transport)
+    while (retryCount < maxRetries) {
+        try {
+            transport = await router.createWebRtcTransport(webRtcTransportOptions);
+            break;
+        } catch (error) {
+            retryCount++;
+            if (retryCount === maxRetries) {
+                throw error;
+            }
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
 
-
-
-    console.log(`transport id: ${transport.id}`)
+    // Store transport with proper ID
+    const transportId = transport.id;
+    transports.set(transportId, transport);
+    
+    console.log(`Transport ${transportId} created successfully`);
 
     transport.on('dtlsstatechange', dtlsState => {
+      console.log(`Transport ${transportId} dtls state: ${dtlsState}`);
       if (dtlsState === 'closed') {
         transport.close()
       }
@@ -69,11 +82,8 @@ const createWebRtcTransport = async (socket, worker, rooms, RoomId, callback, tr
 
     transport.on('close', () => {
       console.log('transport closed');
+      transports.delete(transportId);
     });
-
-    transport.on('close', () => {
-      console.log('transport closed')
-    })
 
     // send back to the client the following prameters
     // const rtpCapabilities = router.rtpCapabilities;
@@ -83,24 +93,24 @@ const createWebRtcTransport = async (socket, worker, rooms, RoomId, callback, tr
     callback({
       // https://mediasoup.org/documentation/v3/mediasoup-client/api/#TransportOptions
       params: {
-        id: transport.id,
+        id: transportId,
         iceParameters: transport.iceParameters,
         iceCandidates: transport.iceCandidates,
         dtlsParameters: transport.dtlsParameters,
+        transportId: transportId // Important: Send back the same ID
       }
-    }
-    )
-    // }
+    });
 
     return transport
 
   } catch (error) {
-    console.log(error)
+    console.error('Transport creation error:', error);
     callback({
       params: {
-        error: error
+        error: error.message
       }
     })
+    throw error;
   }
 }
 module.exports = { createWebRtcTransport };

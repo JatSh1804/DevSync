@@ -34,6 +34,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import MembersSheet from "@/components/ui/member-sheet";
 import { AnimatePresence, motion } from "framer-motion";
 import { CircleCheck, CircleCheckBig, RefreshCcw } from "lucide-react";
+import { FloatingVideo } from '../components/FloatingVideo';
+import { useMediasoup } from '../hooks/useMediasoup';
+import { StreamDebugger } from '../components/StreamDebugger';
 
 interface ModalValue {
     active: boolean;
@@ -496,6 +499,31 @@ export default function Editorpage() {
     };
     React.useEffect(() => { console.log(`Last edit by ${lastEdit}`) }, [lastEdit])
 
+    const {
+        localStream,
+        remoteStreams,
+        remoteStates,  // Add this
+        isAudioEnabled,
+        isVideoEnabled,
+        toggleAudio,
+        toggleVideo,
+        startStreaming
+    } = useMediasoup({ socket, roomId: RoomId, username: location.state.username });
+
+    useEffect(() => {
+        console.log('debug- localStreams:', localStream)
+        console.log('debug- remoteStreams:', remoteStreams)
+    }, [remoteStreams,localStream])
+    // Add this near your other buttons
+    const startCall = async () => {
+        try {
+            await startStreaming();
+            Toast.success('Video call started');
+        } catch (error) {
+            Toast.error('Failed to start video call');
+        }
+    };
+
     return (
         <>
             <Toaster position="top-right" />
@@ -621,6 +649,7 @@ export default function Editorpage() {
                                 <input id='copy' type="button" className="success" onClick={copyclipboard} value={'Copy Room Id'}></input>
                                 <input id='leave' type="button" className="error" onClick={leaveroom} value={'Leave Room'}></input>
                             </div>
+                            <Button onClick={startCall}>Start Video Call</Button>
                         </div>
                     </ResizablePanel>
                     <ResizableHandle withHandle />
@@ -630,6 +659,20 @@ export default function Editorpage() {
                 </ResizablePanelGroup>
 
             </div>
+            <FloatingVideo
+                localStream={localStream}
+                remoteStreams={remoteStreams}
+                remoteStates={remoteStates}  // Add this
+                onToggleAudio={toggleAudio}
+                onToggleVideo={toggleVideo}
+                isAudioEnabled={isAudioEnabled}
+                isVideoEnabled={isVideoEnabled}
+                username={location.state.username}
+            />
+            <StreamDebugger
+                localStream={localStream}
+                remoteStreams={remoteStreams}
+            />
         </>
     )
 }
