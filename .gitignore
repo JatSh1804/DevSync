@@ -9,7 +9,6 @@ lerna-debug.log*
 
 node_modules
 dotenv
-dist
 dist-ssr
 *.local
 public
