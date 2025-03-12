@@ -64,7 +64,7 @@ app.use(express.urlencoded({ extended: false }))
 
 app.use(cookieParser())
 
-app.use(express.static('./dist'));
+app.use(express.static(path.join(__dirname,'dist')))
 
 app.get('/api/auth/verify', (req, res) => {
     authenticate(req.headers?.authorization?.split(' ')[1] || req.cookies?.token)
@@ -80,8 +80,8 @@ app.get('/api/auth/verify', (req, res) => {
 });
 
 app.get('*', (req, res, next) => {
-    console.log("received...");
-    res.sendFile(path.join(__dirname, './dist', 'index.html'));
+    // console.log("received...");
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 app.post("/Login", Login);
