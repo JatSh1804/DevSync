@@ -7,7 +7,7 @@ const activeTransports = new Map();
 // Add transport state tracking
 const transportConnections = new Map();
 
-// Improve the producer finding logic with more detailed logging
+// Improve the producer finding logic with more detailed logging and caching
 const findProducer = async (producers, producerId) => {
     console.log(`Looking for producer with ID: ${producerId}`);
     console.log(`Available producers: ${producers.size} sockets`);
@@ -20,17 +20,37 @@ const findProducer = async (producers, producerId) => {
         });
     });
 
+    // First check in our producer cache if we've recently seen this producer
+    if (producerCache.has(producerId)) {
+        const { producer, socketId, kind, timestamp } = producerCache.get(producerId);
+        // Verify the producer is still valid (less than 60 seconds old)
+        if (Date.now() - timestamp < 60000 && !producer.closed) {
+            console.log(`Producer ${producerId} found in cache from socket ${socketId} of kind ${kind}`);
+            return { producer, socketId, kind };
+        } else {
+            // Remove stale entry
+            producerCache.delete(producerId);
+        }
+    }
+
+    // Search through all producers
     for (const [socketId, producerMap] of producers.entries()) {
         for (const [kind, producer] of producerMap.entries()) {
             if (producer.id === producerId) {
                 console.log(`Found producer ${producerId} from socket ${socketId} of kind ${kind}`);
+                // Cache this producer for future lookups
+                producerCache.set(producerId, { producer, socketId, kind, timestamp: Date.now() });
                 return { producer, socketId, kind };
             }
         }
     }
+    
     console.log(`Producer ${producerId} NOT FOUND`);
     return null;
 };
+
+// Add a producer cache to avoid repeated lookups
+const producerCache = new Map();
 
 module.exports = RTPHandlers = (worker, socket, rooms, producers, consumers, transports) => {
     // In your RTPHandlers.js
@@ -287,23 +307,34 @@ module.exports = RTPHandlers = (worker, socket, rooms, producers, consumers, tra
                 throw new Error(`Router not found for room: ${roomId}`);
             }
 
-            // Log all active producers for debugging
-            console.log(`Searching for producer ${remoteProducerId} among all producers:`);
-            producers.forEach((producerMap, socketId) => {
-                console.log(`- Socket ${socketId} has producers:`, Array.from(producerMap.values()).map(p => p.id));
-            });
-
-            // Find producer with the helper function - improved version with retry
-            let producerData = await findProducer(producers, remoteProducerId);
+            // Find producer with the helper function - improved version with multiple retries
+            let producerData = null;
+            let retries = 0;
+            const maxRetries = 3;
             
-            if (!producerData) {
-                // If producer not found, wait a bit and retry once
-                console.log(`Producer ${remoteProducerId} not found, retrying after delay...`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
+            while (!producerData && retries < maxRetries) {
                 producerData = await findProducer(producers, remoteProducerId);
+                
+                if (!producerData && retries < maxRetries - 1) {
+                    console.log(`Producer ${remoteProducerId} not found, retry ${retries + 1}/${maxRetries}...`);
+                    await new Promise(resolve => setTimeout(resolve, 1000 * (retries + 1)));
+                    retries++;
+                } else if (!producerData) {
+                    console.log(`Producer ${remoteProducerId} not found after ${maxRetries} retries`);
+                    break;
+                }
             }
             
             if (!producerData) {
+                // Check if we should create a dummy consumer when producer is not found
+                // This helps with signaling issues in remote deployments
+                if (process.env.NODE_ENV === 'production') {
+                    console.log(`Creating placeholder response for missing producer ${remoteProducerId}`);
+                    return callback({
+                        error: 'Producer not found, will retry automatically',
+                        retry: true
+                    });
+                }
                 throw new Error(`Producer not found: ${remoteProducerId}`);
             }
 
@@ -318,7 +349,7 @@ module.exports = RTPHandlers = (worker, socket, rooms, producers, consumers, tra
             console.log('Producer codecs:', JSON.stringify(producer.rtpParameters.codecs));
             console.log('Consumer capabilities:', JSON.stringify(rtpCapabilities.codecs));
             
-            // Find matching codecs manually
+            // Find matching codecs manually - more robust implementation
             const matchingCodecs = producer.rtpParameters.codecs.filter(producerCodec => 
                 rtpCapabilities.codecs.some(consumerCodec => 
                     consumerCodec.mimeType.toLowerCase() === producerCodec.mimeType.toLowerCase()
@@ -328,10 +359,12 @@ module.exports = RTPHandlers = (worker, socket, rooms, producers, consumers, tra
             console.log('Matching codecs:', matchingCodecs.length > 0 ? 'YES' : 'NO');
             
             // Check if router can consume with more detailed error handling
-            if (!router.canConsume({
+            const canConsume = router.canConsume({
                 producerId: producer.id,
                 rtpCapabilities,
-            })) {
+            });
+            
+            if (!canConsume) {
                 console.error('Router cannot consume. Capabilities mismatch:', {
                     producerCodecs: producer.rtpParameters.codecs.map(c => c.mimeType),
                     consumerCapabilities: rtpCapabilities.codecs.map(c => c.mimeType)
@@ -358,6 +391,13 @@ module.exports = RTPHandlers = (worker, socket, rooms, producers, consumers, tra
                 console.log(`Consumer created with ID: ${consumer.id}`);
             } catch (error) {
                 console.error('Consumer creation error:', error);
+                // If in production, give client opportunity to retry
+                if (process.env.NODE_ENV === 'production' && error.message.includes('not found')) {
+                    return callback({
+                        error: 'Producer connection issue, will retry automatically',
+                        retry: true
+                    });
+                }
                 throw new Error(`Failed to create consumer: ${error.message}`);
             }
 
